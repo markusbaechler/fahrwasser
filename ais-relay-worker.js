@@ -36,7 +36,7 @@ export default {
 
     try {
       const t0 = Date.now();
-      const { ships, dbg } = await collect(env.AISSTREAM_API_KEY, box, Number(env.WINDOW_MS) || 8000, env.DEBUG_WORLD === '1');
+      const { ships, dbg } = await collect(env.AISSTREAM_API_KEY, box, Number(env.WINDOW_MS) || 8000);
       const body = { ts: new Date().toISOString(), bbox: box, ships, debug: { ...dbg, ms: Date.now() - t0 } };
       memo.set(key, { at: Date.now(), body });
       if (memo.size > 200) memo.delete(memo.keys().next().value);
@@ -53,7 +53,7 @@ function json(body, status, headers) {
   });
 }
 
-async function collect(apiKey, [w, s, e, n], windowMs, world) {
+async function collect(apiKey, [w, s, e, n], windowMs) {
   // permessage-deflate: aisstream drosselt seit Sept. 2026 unkomprimierte Verbindungen
   const resp = await fetch('https://stream.aisstream.io/v0/stream', { headers: { Upgrade: 'websocket', 'Sec-WebSocket-Extensions': 'permessage-deflate' } });
   const ws = resp.webSocket;
@@ -61,7 +61,7 @@ async function collect(apiKey, [w, s, e, n], windowMs, world) {
   ws.accept();
   ws.send(JSON.stringify({
     APIKey: apiKey,
-    BoundingBoxes: world ? [[[-90, -180], [90, 180]]] : [[[s, w], [n, e]]], // Format: [[lat, lon], [lat, lon]]
+    BoundingBoxes: [[[s, w], [n, e]]], // Format: [[lat, lon], [lat, lon]]
     FilterMessageTypes: ['PositionReport', 'StandardClassBPositionReport', 'ExtendedClassBPositionReport', 'ShipStaticData', 'StaticDataReport']
   }));
 
@@ -74,10 +74,7 @@ async function collect(apiKey, [w, s, e, n], windowMs, world) {
       if (done) return;
       done = true; clearTimeout(timer);
       try { ws.close(1000, 'done'); } catch {}
-      const all = [...ships.values()];
-      dbg.total = all.length; dbg.sample = all.slice(0, 2);
-      const inBox = all.filter(x => Number.isFinite(x.lat) && x.lat >= s && x.lat <= n && x.lon >= w && x.lon <= e);
-      err && !ships.size ? reject(err) : resolve({ ships: world ? inBox : all.filter(x => Number.isFinite(x.lat) || x.name), dbg });
+      err && !ships.size ? reject(err) : resolve({ ships: [...ships.values()].filter(x => Number.isFinite(x.lat) || x.name), dbg });
     };
     const timer = setTimeout(() => finish(), windowMs);
     ws.addEventListener('message', ev => {
