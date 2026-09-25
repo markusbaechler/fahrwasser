@@ -52,6 +52,8 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 [data-mode=dusk] #map canvas{filter:invert(1) hue-rotate(180deg) brightness(.9) saturate(.85)}
 [data-mode=night] #map canvas{filter:grayscale(1) invert(1) brightness(.6) contrast(1.2)}
 #map.tool canvas{cursor:crosshair}
+#windCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+select.sel{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);color:var(--text);font:15px var(--fc)}
 .maplibregl-ctrl-scale{background:var(--bg);color:var(--text);border-color:var(--text);font:500 12px var(--fc)}
 .maplibregl-ctrl-attrib{background:var(--bg)!important;color:var(--muted)}
 .maplibregl-ctrl-attrib a{color:var(--muted)}
@@ -181,7 +183,7 @@ const CFG = {
   marine: 'https://marine-api.open-meteo.com/v1/marine',
   geocode: 'https://nominatim.openstreetmap.org/search',
   aisPollMs: 20000, aisStaleMin: 10, aisDropMin: 30, aisMinZoom: 8,
-  version: '1.1.1'
+  version: '1.2.0'
 };
 
 /* ---------- Speicher (fehlertolerant) ---------- */
@@ -236,7 +238,10 @@ const I18N = {
     rel0:'Gegenan', rel1:'Am Wind', rel2:'Halbwind', rel3:'Raumschots', rel4:'Vor dem Wind', portS:'Bb', stbdS:'Stb',
     objekt:'Objekt', objMore:'Weitere Objekte an dieser Stelle', light:'Feuer', characteristic:'Kennung',
     range:'Tragweite', height:'Höhe', colour:'Farbe', shape:'Form', topmark:'Toppzeichen', sector:'Sektor',
-    relayTest:'Relay testen', relayOk:'Relay antwortet', relayFail:'Relay-Fehler', ships:'Schiffe', testing:'Teste …'
+    relayTest:'Relay testen', relayOk:'Relay antwortet', relayFail:'Relay-Fehler', ships:'Schiffe', testing:'Teste …',
+    wxModel:'Wettermodell', wxModelNote:'Gilt für Wind-Widget, Windanimation, Wetterpanel und Wind entlang der Route. Wellen kommen immer vom Marine-Modell.',
+    m_best_match:'Beste Kombination (automatisch)', m_icon_seamless:'DWD ICON', m_ecmwf_ifs025:'ECMWF IFS 0.25°', m_gfs_seamless:'NOAA GFS', m_meteofrance_seamless:'Météo-France AROME/ARPEGE', m_ukmo_seamless:'UK Met Office',
+    windAnim:'Windanimation'
   },
   en: {
     fahrt:'Voyage', messen:'Measure', route:'Route', schiffe:'Ships', wetter:'Weather', mehr:'More',
@@ -282,7 +287,10 @@ const I18N = {
     rel0:'Head wind', rel1:'Close-hauled', rel2:'Beam reach', rel3:'Broad reach', rel4:'Running', portS:'port', stbdS:'stbd',
     objekt:'Object', objMore:'More objects here', light:'Light', characteristic:'Characteristic',
     range:'Range', height:'Height', colour:'Colour', shape:'Shape', topmark:'Topmark', sector:'Sector',
-    relayTest:'Test relay', relayOk:'Relay responds', relayFail:'Relay error', ships:'ships', testing:'Testing …'
+    relayTest:'Test relay', relayOk:'Relay responds', relayFail:'Relay error', ships:'ships', testing:'Testing …',
+    wxModel:'Weather model', wxModelNote:'Applies to the wind widget, wind animation, weather panel and wind along the route. Waves always come from the marine model.',
+    m_best_match:'Best match (automatic)', m_icon_seamless:'DWD ICON', m_ecmwf_ifs025:'ECMWF IFS 0.25°', m_gfs_seamless:'NOAA GFS', m_meteofrance_seamless:'Météo-France AROME/ARPEGE', m_ukmo_seamless:'UK Met Office',
+    windAnim:'Wind animation'
   }
 };
 const COMPASS = {
@@ -375,7 +383,7 @@ const S = {
   tracking: false, track: store.get('track', []),
   measure: [], route: store.get('route', []), routeSpeed: store.get('routeSpeed', 5),
   ais: new Map(), aisOn: store.get('aisOn', true), aisStatus: 'idle', aisAt: null, relay: store.get('relay', 'https://fahrwasser-ais.markus-baechler.workers.dev'),
-  windOn: store.get('windOn', true), wx: null, marine: null, wxAt: 0, wxPos: null, wxErr: false, marineErr: false,
+  windOn: store.get('windOn', true), wxModel: store.get('wxModel', 'best_match'), wx: null, marine: null, wxAt: 0, wxPos: null, wxErr: false, marineErr: false,
   nav: { on: false, wp: 0 }, routeWx: null, routeWxState: 'idle', objs: [], objIdx: 0, relayTest: '',
   selected: null, searchQ: '', searchRes: [], searchState: 'idle', online: navigator.onLine
 };
@@ -384,6 +392,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const loc = () => lang === 'de' ? 'de-CH' : 'en-GB';
 const nf = (v, d = 1) => (v == null || !isFinite(v)) ? '–' : v.toLocaleString(loc(), { minimumFractionDigits: d, maximumFractionDigits: d });
 const deg3 = v => (v == null || !isFinite(v)) ? '–' : String(Math.round(v) % 360).padStart(3, '0') + '°';
+const WX_MODELS = ['best_match', 'icon_seamless', 'ecmwf_ifs025', 'gfs_seamless', 'meteofrance_seamless', 'ukmo_seamless'];
+const modelQ = () => S.wxModel && S.wxModel !== 'best_match' ? `&models=${S.wxModel}` : '';
 const debounce = (fn, ms) => { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; };
 
 /* ---------- Geodäsie ---------- */
@@ -542,6 +552,7 @@ map.on('load', () => {
 
   renderTrack(); renderRoute(); renderMeasure(); renderAis(); renderOwn(); renderNav();
   pollAis(); loadWx();
+  windInit(); loadField();
 });
 
 map.on('moveend', () => {
@@ -663,7 +674,7 @@ async function loadRouteWx() {
   const lat = pts.map(w => w.p[1].toFixed(3)).join(','), lon = pts.map(w => w.p[0].toFixed(3)).join(',');
   try {
     const [w, m] = await Promise.allSettled([
-      fetchJson(`${CFG.meteo}?latitude=${lat}&longitude=${lon}&timezone=auto&forecast_days=7&wind_speed_unit=kn&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m`),
+      fetchJson(`${CFG.meteo}?latitude=${lat}&longitude=${lon}&timezone=auto&forecast_days=7&wind_speed_unit=kn&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m${modelQ()}`),
       fetchJson(`${CFG.marine}?latitude=${lat}&longitude=${lon}&timezone=auto&forecast_days=7&hourly=wave_height`)
     ]);
     if (w.status !== 'fulfilled') throw new Error('wx');
@@ -759,7 +770,7 @@ async function loadWx(force) {
   S.wxPos = p; S.wxAt = Date.now();
   const ll = `latitude=${c.lat.toFixed(3)}&longitude=${c.lng.toFixed(3)}&timezone=auto`;
   const [w, m] = await Promise.allSettled([
-    fetchJson(`${CFG.meteo}?${ll}&forecast_days=2&wind_speed_unit=kn&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation_probability`),
+    fetchJson(`${CFG.meteo}?${ll}&forecast_days=2&wind_speed_unit=kn&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation_probability${modelQ()}`),
     fetchJson(`${CFG.marine}?${ll}&forecast_days=3&hourly=wave_height,wave_direction,wave_period,sea_level_height_msl`)
   ]);
   S.wx = w.status === 'fulfilled' ? w.value : S.wx;
@@ -780,11 +791,90 @@ function renderWind() {
   if (!c) { $('windV').innerHTML = '–'; $('windS').textContent = S.wxErr ? t('wxError') : t('wxLoading'); return; }
   const kn = c.wind_speed_10m, dir = c.wind_direction_10m;
   $('windV').innerHTML = `${Math.round(kn)}<small>kn</small>`;
-  $('windS').textContent = `${bft(kn)} Bft ${t('from')} ${compass(dir)}, ${t('gusts')} ${Math.round(c.wind_gusts_10m)}`;
+  $('windS').textContent = `${bft(kn)} Bft ${t('from')} ${compass(dir)}, ${t('gusts')} ${c.wind_gusts_10m != null ? Math.round(c.wind_gusts_10m) : '–'}`;
   // Pfeil zeigt, wohin der Wind weht
   $('windArr').style.transform = `rotate(${dir}deg)`;
   $('wind').setAttribute('aria-label', `${t('wind')} ${Math.round(kn)} kn, ${bft(kn)} Beaufort ${t('from')} ${compass(dir)}`);
 }
+
+
+/* ---------- Windanimation (Partikel über der Karte) ---------- */
+const WF = { cv: null, g: null, grid: null, gridAt: 0, gridKey: '', parts: [], w: 0, h: 0, moving: false, dpr: 1 };
+function windInit() {
+  WF.cv = document.createElement('canvas'); WF.cv.id = 'windCv';
+  $('map').appendChild(WF.cv); WF.g = WF.cv.getContext('2d');
+  windResize(); window.addEventListener('resize', windResize);
+  map.on('movestart', () => { WF.moving = true; windClear(); });
+  map.on('moveend', () => { WF.moving = false; windClear(); debouncedField(); });
+  requestAnimationFrame(windFrame);
+}
+function windResize() {
+  const r = $('map').getBoundingClientRect();
+  WF.dpr = Math.min(2, window.devicePixelRatio || 1);
+  WF.w = r.width; WF.h = r.height;
+  WF.cv.width = Math.round(r.width * WF.dpr); WF.cv.height = Math.round(r.height * WF.dpr);
+  WF.g.setTransform(WF.dpr, 0, 0, WF.dpr, 0, 0);
+  windClear();
+}
+function windClear() { if (WF.g) WF.g.clearRect(0, 0, WF.w, WF.h); WF.parts = []; }
+async function loadField() {
+  if (!mapReady || !S.windOn || !S.online) return;
+  const b = map.getBounds(), NX = 5, NY = 4, W = b.getWest(), E = b.getEast(), So = b.getSouth(), N = b.getNorth();
+  const key = [W, So, E, N].map(v => v.toFixed(2)).join(',') + '|' + S.wxModel;
+  if (key === WF.gridKey && Date.now() - WF.gridAt < 15 * 60000) return;
+  const lats = [], lons = [];
+  for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
+    lons.push(+(W + (E - W) * i / (NX - 1)).toFixed(3)); lats.push(+(So + (N - So) * j / (NY - 1)).toFixed(3));
+  }
+  try {
+    const r = await fetchJson(`${CFG.meteo}?latitude=${lats.join(',')}&longitude=${lons.join(',')}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn${modelQ()}`);
+    const arr = Array.isArray(r) ? r : [r];
+    if (arr.length !== NX * NY) throw new Error('grid');
+    // u = Ost-, v = Nord-Komponente der Windbewegung (Richtung, wohin er weht)
+    const pts = arr.map((d, k) => {
+      const kn = d.current.wind_speed_10m, to = rad((d.current.wind_direction_10m + 180) % 360);
+      return { u: kn * Math.sin(to), v: kn * Math.cos(to) };
+    });
+    WF.grid = { nx: NX, ny: NY, W, E, S: So, N, pts };
+    WF.gridKey = key; WF.gridAt = Date.now(); windClear();
+  } catch { /* Animation bleibt einfach aus */ }
+}
+const debouncedField = debounce(loadField, 2500);
+function windAt(lng, lat) {
+  const g = WF.grid;
+  const fx = Math.min(g.nx - 1, Math.max(0, (lng - g.W) / (g.E - g.W) * (g.nx - 1)));
+  const fy = Math.min(g.ny - 1, Math.max(0, (lat - g.S) / (g.N - g.S) * (g.ny - 1)));
+  const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(g.nx - 1, x0 + 1), y1 = Math.min(g.ny - 1, y0 + 1), tx = fx - x0, ty = fy - y0;
+  const p = (x, y) => g.pts[y * g.nx + x];
+  const a = p(x0, y0), b = p(x1, y0), c = p(x0, y1), d = p(x1, y1);
+  return {
+    u: (a.u * (1 - tx) + b.u * tx) * (1 - ty) + (c.u * (1 - tx) + d.u * tx) * ty,
+    v: (a.v * (1 - tx) + b.v * tx) * (1 - ty) + (c.v * (1 - tx) + d.v * tx) * ty
+  };
+}
+function windFrame() {
+  requestAnimationFrame(windFrame);
+  if (!S.windOn || !WF.grid || WF.moving || document.hidden || !WF.g) return;
+  const g = WF.g, n = Math.min(400, Math.round(WF.w * WF.h / 1800));
+  while (WF.parts.length < n) WF.parts.push({ x: Math.random() * WF.w, y: Math.random() * WF.h, age: Math.random() * 90 | 0 });
+  // Spuren ausblenden
+  g.globalCompositeOperation = 'destination-in'; g.fillStyle = 'rgba(0,0,0,.93)'; g.fillRect(0, 0, WF.w, WF.h);
+  g.globalCompositeOperation = 'source-over';
+  g.lineWidth = 1.4; g.lineCap = 'round'; g.strokeStyle = S.mode === 'day' ? 'rgba(15,37,54,.55)' : 'rgba(15,37,54,.75)';
+  g.beginPath();
+  for (const p of WF.parts) {
+    if (++p.age > 90) { p.x = Math.random() * WF.w; p.y = Math.random() * WF.h; p.age = 0; continue; }
+    const ll = map.unproject([p.x, p.y]);
+    const w = windAt(ll.lng, ll.lat);
+    const k = 0.07; // Pixel pro Knoten und Frame
+    const nx = p.x + w.u * k, ny = p.y - w.v * k;
+    g.moveTo(p.x, p.y); g.lineTo(nx, ny);
+    p.x = nx; p.y = ny;
+    if (p.x < 0 || p.y < 0 || p.x > WF.w || p.y > WF.h) p.age = 999;
+  }
+  g.stroke();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) windClear(); });
 
 /* ---------- GPS ---------- */
 function startGps() {
@@ -1031,8 +1121,12 @@ function pShip() {
   return `<dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
 }
 
+function modelSel() {
+  return `<label class="f" for="wxModel">${t('wxModel')}</label>
+    <select class="sel" id="wxModel" data-input="wxModel">${WX_MODELS.map(m => `<option value="${m}" ${m === S.wxModel ? 'selected' : ''}>${esc(t('m_' + m))}</option>`).join('')}</select>`;
+}
 function pWetter() {
-  if (!S.wx) return `<p class="note ${S.wxErr ? 'err' : ''}">${S.wxErr ? t('wxError') : t('wxLoading')}</p>`;
+  if (!S.wx) return modelSel() + `<p class="note ${S.wxErr ? 'err' : ''}">${S.wxErr ? t('wxError') : t('wxLoading')}</p>`; `<p class="note ${S.wxErr ? 'err' : ''}">${S.wxErr ? t('wxError') : t('wxLoading')}</p>`;
   const c = S.wx.current, h = S.wx.hourly;
   const mi = {};
   if (S.marine && S.marine.hourly) S.marine.hourly.time.forEach((tm, i) => mi[tm] = i);
@@ -1043,16 +1137,16 @@ function pWetter() {
   for (let i = i0; i < Math.min(h.time.length, i0 + 25); i += 2) {
     const j = mi[h.time[i]], wv = mh && j != null ? mh.wave_height[j] : null;
     rows.push(`<tr><td>${h.time[i].slice(11, 16)}</td>
-      <td>${Math.round(h.wind_speed_10m[i])} <span class="note">(${Math.round(h.wind_gusts_10m[i])})</span></td>
+      <td>${Math.round(h.wind_speed_10m[i])} <span class="note">(${h.wind_gusts_10m && h.wind_gusts_10m[i] != null ? Math.round(h.wind_gusts_10m[i]) : '–'})</span></td>
       <td>${compass(h.wind_direction_10m[i])} <svg class="arr" viewBox="0 0 24 24" style="transform:rotate(${h.wind_direction_10m[i]}deg)"><path d="M12 3v18M6 15l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5"/></svg></td>
       <td>${wv != null ? nf(wv) + ' m' : '–'}</td>
       <td>${h.precipitation_probability[i] ?? '–'} %</td></tr>`);
   }
-  return `<div class="readout">
+  return modelSel() + `<div class="readout">
       <div><b>${Math.round(c.wind_speed_10m)}<small>kn</small></b><span>${bft(c.wind_speed_10m)} Bft ${t('from')} ${compass(c.wind_direction_10m)}</span></div>
       <div><b>${wNow != null ? nf(wNow) : '–'}<small>m</small></b><span>${t('waves')}</span></div>
     </div>
-    <dl class="kv"><dt>${t('gusts')}</dt><dd>${Math.round(c.wind_gusts_10m)} kn</dd></dl>
+    <dl class="kv"><dt>${t('gusts')}</dt><dd>${c.wind_gusts_10m != null ? Math.round(c.wind_gusts_10m) : '–'} kn</dd></dl>
     <table class="t"><thead><tr><th>${t('time')}</th><th>kn</th><th>${t('from')}</th><th>${t('waves')}</th><th>${t('rain')}</th></tr></thead><tbody>${rows.join('')}</tbody></table>
     <p class="note">${t('wxAt')} ${c.time.slice(11, 16)} ${esc(S.wx.timezone_abbreviation || '')}, ${t('wxFor')}.</p>
     <div class="row">${btn('wxRefresh', t('refresh'))}</div>`;
@@ -1101,7 +1195,7 @@ function pGezeiten() {
     <p class="note">${t('tideNote')}</p>`;
 }
 function pInfo() {
-  return `<label class="f" for="relay">${t('relay')}</label>
+  return modelSel() + `<p class="note">${t('wxModelNote')}</p><label class="f" for="relay">${t('relay')}</label>
     <form class="inline" data-form="relay">
       <input id="relay" type="url" name="relay" value="${esc(S.relay)}" placeholder="https://…" autocomplete="off" inputmode="url">
       <button class="btn" type="submit">${t('save')}</button>
@@ -1158,7 +1252,7 @@ const ACTIONS = {
     S.relayTest = t('testing'); renderPanel();
     try {
       const j = await fetchJson(`${S.relay}${S.relay.includes('?') ? '&' : '?'}bbox=${bbox}`, 25000);
-      S.relayTest = `${t('relayOk')}: ${(j.ships || []).length} ${t('ships')}`;
+      S.relayTest = `${t('relayOk')}: ${(j.ships || []).length} ${t('ships')}` + (j.debug ? ` · ${JSON.stringify(j.debug)}` : '');
     } catch (e) { S.relayTest = `${t('relayFail')}: ${(e.body && e.body.error) || e.message}`; }
     renderPanel();
   },
@@ -1176,6 +1270,11 @@ $('sheetBody').addEventListener('click', e => {
   if (el && !el.disabled && ACTIONS[el.dataset.act]) ACTIONS[el.dataset.act](el);
 });
 $('sheetBody').addEventListener('change', e => {
+  if (e.target.dataset.input === 'wxModel') {
+    S.wxModel = WX_MODELS.includes(e.target.value) ? e.target.value : 'best_match'; store.set('wxModel', S.wxModel);
+    S.wxAt = 0; S.routeWx = null; S.routeWxState = 'idle'; WF.gridKey = '';
+    loadWx(true); loadField(); toast(t('saved'));
+  }
   if (e.target.dataset.input === 'speed') {
     const v = parseFloat(String(e.target.value).replace(',', '.'));
     if (v > 0) { S.routeSpeed = v; store.set('routeSpeed', v); S.routeWx = null; S.routeWxState = 'idle'; renderPanel(); }
@@ -1226,7 +1325,7 @@ $('locBtn').onclick = () => {
   if (S.panel === 'fahrt') renderPanel();
 };
 $('chipAis').onclick = toggleAis;
-$('chipWind').onclick = () => { S.windOn = !S.windOn; store.set('windOn', S.windOn); renderWind(); renderChips(); };
+$('chipWind').onclick = () => { S.windOn = !S.windOn; store.set('windOn', S.windOn); renderWind(); renderChips(); windClear(); if (S.windOn) loadField(); };
 $('posBtn').onclick = () => { S.coordFmt = S.coordFmt === 'dm' ? 'dec' : 'dm'; store.set('coordFmt', S.coordFmt); renderStatus(); if (S.panel) renderPanel(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.panel) closePanel(); });
 addEventListener('online', () => { S.online = true; renderStatus(); toast(t('online')); pollAis(); loadWx(true); });
