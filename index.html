@@ -182,8 +182,9 @@ const CFG = {
   meteo: 'https://api.open-meteo.com/v1/forecast',
   marine: 'https://marine-api.open-meteo.com/v1/marine',
   geocode: 'https://nominatim.openstreetmap.org/search',
+  ais: 'https://ais.openwaters.io/v1/vessels',
   aisPollMs: 20000, aisStaleMin: 10, aisDropMin: 30, aisMinZoom: 8,
-  version: '1.2.1'
+  version: '1.3.0'
 };
 
 /* ---------- Speicher (fehlertolerant) ---------- */
@@ -208,7 +209,7 @@ const I18N = {
     distance:'Distanz', course:'Kurs rw', reverse:'Gegenkurs', newMeasure:'Neu messen',
     routeHint:'Tippe auf die Karte, um Wegpunkte zu setzen.', total:'Gesamt', speed:'Geplante Fahrt (kn)',
     duration:'Dauer', eta:'Ankunft', undo:'Letzten entfernen', reverseRoute:'Umkehren', wp:'WP',
-    aisOn:'Schiffe anzeigen', aisNoRelay:'AIS ist noch nicht eingerichtet. Trage unter Mehr › Info die Adresse deines AIS-Relays ein.',
+    aisOn:'Schiffe anzeigen', aisNoRelay:'AIS-Quelle nicht erreichbar.',
     aisZoom:'Zoome näher heran, um Schiffe zu laden.', aisLoading:'Lade Schiffe …', aisError:'AIS-Relay nicht erreichbar',
     aisNotCfg:'Das Relay hat keinen API-Key hinterlegt.', aisOk:'Aktualisiert', aisNone:'Keine Schiffe im Ausschnitt.',
     inView:'im Ausschnitt', older:'älter als', greyed:'grau', minutes:'min',
@@ -219,7 +220,7 @@ const I18N = {
     searchPh:'Ort, Hafen oder 43.38, 16.21', search:'Suchen', noResults:'Keine Treffer.', searchErr:'Suche fehlgeschlagen.', searching:'Suche …',
     tideNote:'Modellierter Wasserstand relativ zum mittleren Meeresspiegel (Open-Meteo Marine).', high:'Hoch', low:'Niedrig',
     tideNone:'Für diesen Ort gibt es keine Wasserstandsdaten.', tideLoading:'Lade Wasserstand …',
-    relay:'AIS-Relay-Adresse', save:'Speichern', saved:'Gespeichert', sources:'Datenquellen',
+    relay:'Eigenes AIS-Relay (optional)', save:'Speichern', saved:'Gespeichert', sources:'Datenquellen',
     clearCache:'Offline-Karten löschen', cacheCleared:'Offline-Karten gelöscht',
     offline:'Offline: Die Karte zeigt nur bereits geladene Bereiche.', online:'Wieder online',
     gpsDenied:'Standortzugriff verweigert. Erlaube ihn in den Browser-Einstellungen.', gpsNone:'Dieses Gerät liefert keine Position.',
@@ -228,8 +229,8 @@ const I18N = {
     srcDepth:'Tiefen: Open Waters Seascape, globale offene Bathymetrie',
     srcWx:'Wetter, Wellen, Wasserstand: Open-Meteo (CC BY 4.0)',
     srcGeo:'Ortssuche: Nominatim, © OpenStreetMap-Mitwirkende',
-    srcAis:'AIS: aisstream.io über dein eigenes Relay',
-    relayHelp:'Standard: https://fahrwasser-ais.markus-baechler.workers.dev (nur ändern, wenn du ein eigenes Relay betreibst)',
+    srcAis:'AIS: Open Waters AIS (aiscast), offene Behördenfeeds und freiwillige Empfänger',
+    relayHelp:'Leer lassen: Schiffe kommen direkt von Open Waters AIS. Nur ausfüllen, wenn du ein eigenes aisstream-Relay nutzen willst.',
     navStart:'Navigation starten', navStop:'Navigation beenden', navNext:'Nächster WP', navPrev:'Vorheriger WP',
     brg:'Peilung', dst:'Distanz', xte:'Kursabweichung', etaWp:'Ankunft WP', etaEnd:'Ankunft Ziel', navTo:'Kurs auf',
     steerL:'nach Backbord', steerR:'nach Steuerbord', navArrived:'Ziel erreicht.', navNoGps:'Warte auf GPS-Position …',
@@ -257,7 +258,7 @@ const I18N = {
     distance:'Distance', course:'True course', reverse:'Reciprocal', newMeasure:'Measure again',
     routeHint:'Tap the chart to add waypoints.', total:'Total', speed:'Planned speed (kn)',
     duration:'Duration', eta:'Arrival', undo:'Remove last', reverseRoute:'Reverse', wp:'WP',
-    aisOn:'Show ships', aisNoRelay:'AIS is not set up yet. Enter your AIS relay address under More › Info.',
+    aisOn:'Show ships', aisNoRelay:'AIS source unreachable.',
     aisZoom:'Zoom in to load ships.', aisLoading:'Loading ships …', aisError:'AIS relay unreachable',
     aisNotCfg:'The relay has no API key configured.', aisOk:'Updated', aisNone:'No ships in view.',
     inView:'in view', older:'older than', greyed:'greyed out', minutes:'min',
@@ -268,7 +269,7 @@ const I18N = {
     searchPh:'Place, harbour or 43.38, 16.21', search:'Search', noResults:'No results.', searchErr:'Search failed.', searching:'Searching …',
     tideNote:'Modelled water level relative to mean sea level (Open-Meteo Marine).', high:'High', low:'Low',
     tideNone:'No water level data for this location.', tideLoading:'Loading water level …',
-    relay:'AIS relay address', save:'Save', saved:'Saved', sources:'Data sources',
+    relay:'Own AIS relay (optional)', save:'Save', saved:'Saved', sources:'Data sources',
     clearCache:'Delete offline charts', cacheCleared:'Offline charts deleted',
     offline:'Offline: the chart only shows areas loaded earlier.', online:'Back online',
     gpsDenied:'Location access denied. Allow it in your browser settings.', gpsNone:'This device provides no position.',
@@ -277,8 +278,8 @@ const I18N = {
     srcDepth:'Depths: Open Waters Seascape, global open bathymetry',
     srcWx:'Weather, waves, water level: Open-Meteo (CC BY 4.0)',
     srcGeo:'Place search: Nominatim, © OpenStreetMap contributors',
-    srcAis:'AIS: aisstream.io via your own relay',
-    relayHelp:'Default: https://fahrwasser-ais.markus-baechler.workers.dev (change only if you run your own relay)',
+    srcAis:'AIS: Open Waters AIS (aiscast), open government feeds and volunteer receivers',
+    relayHelp:'Leave empty: ships come directly from Open Waters AIS. Fill in only to use your own aisstream relay.',
     navStart:'Start navigation', navStop:'Stop navigation', navNext:'Next WP', navPrev:'Previous WP',
     brg:'Bearing', dst:'Distance', xte:'Cross-track error', etaWp:'ETA waypoint', etaEnd:'ETA destination', navTo:'Heading for',
     steerL:'steer port', steerR:'steer starboard', navArrived:'Destination reached.', navNoGps:'Waiting for GPS fix …',
@@ -382,7 +383,7 @@ const S = {
   own: null, follow: false, watchId: null,
   tracking: false, track: store.get('track', []),
   measure: [], route: store.get('route', []), routeSpeed: store.get('routeSpeed', 5),
-  ais: new Map(), aisOn: store.get('aisOn', true), aisStatus: 'idle', aisAt: null, relay: store.get('relay', 'https://fahrwasser-ais.markus-baechler.workers.dev'),
+  ais: new Map(), aisOn: store.get('aisOn', true), aisStatus: 'idle', aisAt: null, relay: store.get('relay', ''), aisAttrib: null,
   windOn: store.get('windOn', true), wxModel: store.get('wxModel', 'best_match'), wx: null, marine: null, wxAt: 0, wxPos: null, wxErr: false, marineErr: false,
   nav: { on: false, wp: 0 }, routeWx: null, routeWxState: 'idle', objs: [], objIdx: 0, relayTest: '',
   selected: null, searchQ: '', searchRes: [], searchState: 'idle', online: navigator.onLine
@@ -730,9 +731,19 @@ function shipsInView() {
   const b = map.getBounds();
   return [...S.ais.values()].filter(s => isFinite(s.lat) && b.contains([s.lon, s.lat]));
 }
+// Open Waters AIS: GeoJSON, bbox als minLat,minLon,maxLat,maxLon, Schiffe der letzten 30 Minuten
+async function fetchOpenWaters(bboxWSEN) {
+  const [w, s, e, n] = bboxWSEN.split(',');
+  const j = await fetchJson(`${CFG.ais}?bbox=${s},${w},${n},${e}`, 20000);
+  S.aisAttrib = j.attribution || null;
+  return (j.features || []).filter(f => f.properties && f.properties.kind !== 'base' && f.properties.kind !== 'aton' && f.geometry && f.geometry.coordinates).map(f => {
+    const p = f.properties, [lon, lat] = f.geometry.coordinates;
+    return { mmsi: p.mmsi || f.id, lat, lon, name: p.name, type: p.type, cog: p.cog, sog: p.sog, hdg: p.heading,
+      nav: p.nav_status, dest: p.destination, len: p.length, flag: p.flag, t: p.seen, src: p.source };
+  });
+}
 async function pollAis() {
   if (!S.aisOn) return;
-  if (!S.relay) { S.aisStatus = 'norelay'; return afterAis(); }
   if (map.getZoom() < CFG.aisMinZoom) { S.aisStatus = 'zoom'; return afterAis(); }
   if (!S.online) return;
   // Ausschnitt plus Rand (mind. ±0.15°), gleiche Logik wie der Relay-Test
@@ -741,9 +752,9 @@ async function pollAis() {
   const bbox = [c.lng - dx, c.lat - dy, c.lng + dx, c.lat + dy].map(v => v.toFixed(2)).join(',');
   S.aisStatus = S.aisAt ? S.aisStatus : 'loading'; afterAis(true);
   try {
-    const j = await fetchJson(`${S.relay}${S.relay.includes('?') ? '&' : '?'}bbox=${bbox}`, 25000);
     const now = Date.now();
-    for (const r of j.ships || []) {
+    const ships = S.relay ? (await fetchJson(`${S.relay}${S.relay.includes('?') ? '&' : '?'}bbox=${bbox}`, 25000)).ships || [] : await fetchOpenWaters(bbox);
+    for (const r of ships) {
       if (!r.mmsi) continue;
       const prev = S.ais.get(r.mmsi) || { mmsi: r.mmsi, seen: 0 };
       const clean = Object.fromEntries(Object.entries(r).filter(([, v]) => v != null && v !== ''));
@@ -1203,10 +1214,11 @@ function pInfo() {
       <button class="btn" type="submit">${t('save')}</button>
     </form>
     <p class="note">${t('relayHelp')}</p>
-    <div class="row">${btn('relayTest', t('relayTest'), S.relay ? '' : 'disabled')}</div>
+    <div class="row">${btn('relayTest', t('relayTest'))}</div>
     ${S.relayTest ? `<p class="note ${S.relayTest.startsWith(t('relayFail')) ? 'err' : ''}">${esc(S.relayTest)}</p>` : ''}
     <h3 style="font:600 17px var(--fc);margin:20px 0 6px">${t('sources')}</h3>
     <p class="note">${[t('srcChart'), t('srcDepth'), t('srcWx'), t('srcGeo'), t('srcAis')].map(esc).join('<br>')}</p>
+    ${S.aisAttrib ? `<p class="note">${Object.values(S.aisAttrib).map(esc).join('<br>')}</p>` : ''}
     <div class="row">${btn('clearCache', t('clearCache'))}</div>
     <p class="note">Fahrwasser ${CFG.version}</p>`;
 }
@@ -1248,13 +1260,17 @@ const ACTIONS = {
   routeWx: () => loadRouteWx(),
   obj: el => { S.objIdx = +el.dataset.i; renderPanel(); },
   relayTest: async () => {
-    if (!S.relay) return;
     const c = map.getCenter();
     const bbox = [c.lng - .5, c.lat - .3, c.lng + .5, c.lat + .3].map(v => v.toFixed(2)).join(',');
     S.relayTest = t('testing'); renderPanel();
     try {
-      const j = await fetchJson(`${S.relay}${S.relay.includes('?') ? '&' : '?'}bbox=${bbox}`, 25000);
-      S.relayTest = `${t('relayOk')}: ${(j.ships || []).length} ${t('ships')}` + (j.debug ? ` · ${JSON.stringify(j.debug)}` : '');
+      if (S.relay) {
+        const j = await fetchJson(`${S.relay}${S.relay.includes('?') ? '&' : '?'}bbox=${bbox}`, 25000);
+        S.relayTest = `${t('relayOk')}: ${(j.ships || []).length} ${t('ships')}` + (j.debug ? ` · ${JSON.stringify(j.debug)}` : '');
+      } else {
+        const ships = await fetchOpenWaters(bbox);
+        S.relayTest = `Open Waters AIS: ${ships.length} ${t('ships')}`;
+      }
     } catch (e) { S.relayTest = `${t('relayFail')}: ${(e.body && e.body.error) || e.message}`; }
     renderPanel();
   },
