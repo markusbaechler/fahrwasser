@@ -52,6 +52,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 [data-mode=dusk] #map canvas{filter:invert(1) hue-rotate(180deg) brightness(.9) saturate(.85)}
 [data-mode=night] #map canvas{filter:grayscale(1) invert(1) brightness(.6) contrast(1.2)}
 #map.tool canvas{cursor:crosshair}
+.radarinfo{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:4px 10px;font-size:12px;color:var(--muted);width:max-content;margin-bottom:6px}
 #windCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
 select.sel{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);color:var(--text);font:15px var(--fc)}
 .maplibregl-ctrl-scale{background:var(--bg);color:var(--text);border-color:var(--text);font:500 12px var(--fc)}
@@ -133,7 +134,9 @@ label.f{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px}
     <div class="chips">
       <button class="chip" id="chipAis" type="button"><span data-i18n="schiffe"></span><span class="n" id="aisN"></span></button>
       <button class="chip" id="chipWind" type="button"><span data-i18n="wind"></span></button>
+      <button class="chip" id="chipRadar" type="button"><span data-i18n="radar"></span></button>
     </div>
+    <div class="note radarinfo" id="radarInfo" hidden></div>
     <div class="wind" id="wind" hidden>
       <svg viewBox="0 0 24 24" id="windArr"><path d="M12 3v18M6 15l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <div class="v" id="windV">–</div>
@@ -183,8 +186,10 @@ const CFG = {
   marine: 'https://marine-api.open-meteo.com/v1/marine',
   geocode: 'https://nominatim.openstreetmap.org/search',
   ais: 'https://ais.openwaters.io/v1/vessels',
+  tides: 'https://api.openwaters.io/tides',
+  radar: 'https://api.rainviewer.com/public/weather-maps.json',
   aisPollMs: 20000, aisStaleMin: 10, aisDropMin: 30, aisMinZoom: 8,
-  version: '1.3.0'
+  version: '1.4.0'
 };
 
 /* ---------- Speicher (fehlertolerant) ---------- */
@@ -218,7 +223,9 @@ const I18N = {
     wxLoading:'Lade Wetter …', wxError:'Wetter nicht verfügbar. Prüfe die Verbindung.', wxAt:'Open-Meteo, Stand', wxFor:'für die Kartenmitte',
     time:'Zeit', rain:'Regen', now:'Jetzt', refresh:'Aktualisieren',
     searchPh:'Ort, Hafen oder 43.38, 16.21', search:'Suchen', noResults:'Keine Treffer.', searchErr:'Suche fehlgeschlagen.', searching:'Suche …',
-    tideNote:'Modellierter Wasserstand relativ zum mittleren Meeresspiegel (Open-Meteo Marine).', high:'Hoch', low:'Niedrig',
+    tideNote:'Modellierter Wasserstand relativ zum mittleren Meeresspiegel (Open-Meteo Marine) – keine Pegelstation in der Nähe.', high:'Hoch', low:'Niedrig',
+    tideStation:'Pegelstation', tideDatum:'Bezug', tideNeaps:'Gezeitenvorhersage aus harmonischen Konstanten (Neaps, Open Waters). Wetterbedingte Abweichungen (Windstau, Luftdruck) sind nicht enthalten.', tideNow:'Jetzt', rising:'steigend', falling:'fallend',
+    radar:'Radar', radarNote:'Regenradar', radarAt:'Radarbild von', radarErr:'Regenradar nicht verfügbar',
     tideNone:'Für diesen Ort gibt es keine Wasserstandsdaten.', tideLoading:'Lade Wasserstand …',
     relay:'Eigenes AIS-Relay (optional)', save:'Speichern', saved:'Gespeichert', sources:'Datenquellen',
     clearCache:'Offline-Karten löschen', cacheCleared:'Offline-Karten gelöscht',
@@ -227,7 +234,7 @@ const I18N = {
     mapFail:'Die Kartenbibliothek konnte nicht geladen werden. Prüfe die Verbindung und lade neu.',
     srcChart:'Seekarte: Open Waters Seamap (CC BY 4.0), Daten © OpenStreetMap-Mitwirkende',
     srcDepth:'Tiefen: Open Waters Seascape, globale offene Bathymetrie',
-    srcWx:'Wetter, Wellen, Wasserstand: Open-Meteo (CC BY 4.0)',
+    srcWx:'Wetter, Wellen: Open-Meteo (CC BY 4.0)', srcTide:'Gezeiten: Open Waters Tides / Neaps (Stationsdaten), Rückfall Open-Meteo Marine', srcRadar:'Regenradar: RainViewer',
     srcGeo:'Ortssuche: Nominatim, © OpenStreetMap-Mitwirkende',
     srcAis:'AIS: Open Waters AIS (aiscast), offene Behördenfeeds und freiwillige Empfänger',
     relayHelp:'Leer lassen: Schiffe kommen direkt von Open Waters AIS. Nur ausfüllen, wenn du ein eigenes aisstream-Relay nutzen willst.',
@@ -267,7 +274,9 @@ const I18N = {
     wxLoading:'Loading weather …', wxError:'Weather unavailable. Check your connection.', wxAt:'Open-Meteo, as of', wxFor:'for the chart centre',
     time:'Time', rain:'Rain', now:'Now', refresh:'Refresh',
     searchPh:'Place, harbour or 43.38, 16.21', search:'Search', noResults:'No results.', searchErr:'Search failed.', searching:'Searching …',
-    tideNote:'Modelled water level relative to mean sea level (Open-Meteo Marine).', high:'High', low:'Low',
+    tideNote:'Modelled water level relative to mean sea level (Open-Meteo Marine) – no tide station nearby.', high:'High', low:'Low',
+    tideStation:'Tide station', tideDatum:'Datum', tideNeaps:'Tide prediction from harmonic constituents (Neaps, Open Waters). Weather effects (wind set-up, pressure) are not included.', tideNow:'Now', rising:'rising', falling:'falling',
+    radar:'Radar', radarNote:'Rain radar', radarAt:'Radar image from', radarErr:'Rain radar unavailable',
     tideNone:'No water level data for this location.', tideLoading:'Loading water level …',
     relay:'Own AIS relay (optional)', save:'Save', saved:'Saved', sources:'Data sources',
     clearCache:'Delete offline charts', cacheCleared:'Offline charts deleted',
@@ -276,7 +285,7 @@ const I18N = {
     mapFail:'The map library could not be loaded. Check your connection and reload.',
     srcChart:'Chart: Open Waters Seamap (CC BY 4.0), data © OpenStreetMap contributors',
     srcDepth:'Depths: Open Waters Seascape, global open bathymetry',
-    srcWx:'Weather, waves, water level: Open-Meteo (CC BY 4.0)',
+    srcWx:'Weather, waves: Open-Meteo (CC BY 4.0)', srcTide:'Tides: Open Waters Tides / Neaps (station data), fallback Open-Meteo Marine', srcRadar:'Rain radar: RainViewer',
     srcGeo:'Place search: Nominatim, © OpenStreetMap contributors',
     srcAis:'AIS: Open Waters AIS (aiscast), open government feeds and volunteer receivers',
     relayHelp:'Leave empty: ships come directly from Open Waters AIS. Fill in only to use your own aisstream relay.',
@@ -384,7 +393,8 @@ const S = {
   tracking: false, track: store.get('track', []),
   measure: [], route: store.get('route', []), routeSpeed: store.get('routeSpeed', 5),
   ais: new Map(), aisOn: store.get('aisOn', true), aisStatus: 'idle', aisAt: null, relay: store.get('relay', ''), aisAttrib: null,
-  windOn: store.get('windOn', true), wxModel: store.get('wxModel', 'best_match'), wx: null, marine: null, wxAt: 0, wxPos: null, wxErr: false, marineErr: false,
+  windOn: store.get('windOn', true), radarOn: store.get('radarOn', false), radar: null, radarAt: 0, radarErr: false,
+  tide: null, tidePos: null, tideAt: 0, tideErr: false, wxModel: store.get('wxModel', 'best_match'), wx: null, marine: null, wxAt: 0, wxPos: null, wxErr: false, marineErr: false,
   nav: { on: false, wp: 0 }, routeWx: null, routeWxState: 'idle', objs: [], objIdx: 0, relayTest: '',
   selected: null, searchQ: '', searchRes: [], searchState: 'idle', online: navigator.onLine
 };
@@ -553,7 +563,7 @@ map.on('load', () => {
 
   renderTrack(); renderRoute(); renderMeasure(); renderAis(); renderOwn(); renderNav();
   pollAis(); loadWx();
-  windInit(); loadField();
+  windInit(); loadField(); renderRadar(); loadRadar(true);
 });
 
 map.on('moveend', () => {
@@ -791,6 +801,7 @@ async function loadWx(force) {
   S.marine = m.status === 'fulfilled' ? m.value : null;
   S.marineErr = m.status !== 'fulfilled';
   if (S.wxErr) S.wxAt = 0;
+  loadTide(p);
   renderWind();
   if (S.panel === 'wetter' || S.panel === 'gezeiten') renderPanel();
 }
@@ -810,6 +821,72 @@ function renderWind() {
   $('wind').setAttribute('aria-label', `${t('wind')} ${Math.round(kn)} kn, ${bft(kn)} Beaufort ${t('from')} ${compass(dir)}`);
 }
 
+
+
+/* ---------- Gezeiten: Pegelstation (Neaps) mit Modell-Rückfall ---------- */
+async function loadTide(p) {
+  if (S.tidePos && distNm(p, S.tidePos) < 10 && Date.now() - S.tideAt < 60 * 60000 && S.tide) return;
+  S.tidePos = p; S.tideAt = Date.now();
+  const start = new Date(Date.now() - 6 * 3.6e6), end = new Date(Date.now() + 48 * 3.6e6);
+  const q = `latitude=${p[1].toFixed(4)}&longitude=${p[0].toFixed(4)}&start=${start.toISOString()}&end=${end.toISOString()}&units=meters`;
+  try {
+    const [ex, tl] = await Promise.all([fetchJson(`${CFG.tides}/extremes?${q}`), fetchJson(`${CFG.tides}/timeline?${q}`)]);
+    S.tide = { station: ex.station || tl.station, datum: ex.datum || tl.datum, extremes: ex.extremes || [], timeline: tl.timeline || [], at: Date.now() };
+    S.tideErr = false;
+  } catch (e) { S.tide = null; S.tideErr = true; }
+  if (S.panel === 'gezeiten') renderPanel();
+}
+function pTideNeaps() {
+  const T = S.tide, tl = T.timeline.filter(x => isFinite(x.level));
+  if (tl.length < 3) return null;
+  const now = Date.now(), ts = tl.map(x => Date.parse(x.time)), ys = tl.map(x => x.level);
+  let i0 = ts.findIndex(x => x >= now); if (i0 < 0) i0 = ts.length - 1;
+  const lo = Math.min(...ys), hi = Math.max(...ys), span = (hi - lo) || .1;
+  const W = 340, H = 130, pad = 10, t0 = ts[0], t1 = ts[ts.length - 1];
+  const X = tm => pad + (tm - t0) / (t1 - t0) * (W - 2 * pad), Y = y => H - pad - (y - lo) / span * (H - 2 * pad);
+  const d = ys.map((y, i) => `${i ? 'L' : 'M'}${X(ts[i]).toFixed(1)},${Y(y).toFixed(1)}`).join('');
+  const nx = X(Math.min(Math.max(now, t0), t1));
+  const lvlNow = ys[i0], trend = i0 > 0 && i0 < ys.length ? (ys[i0] > ys[i0 - 1] ? t('rising') : t('falling')) : '';
+  const fmt = tm => { const dt = new Date(tm); return `${dt.toLocaleDateString(loc(), { weekday: 'short' })} ${dt.toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' })}`; };
+  const rows = T.extremes.filter(e => Date.parse(e.time) >= now - 3.6e6).slice(0, 8)
+    .map(e => `<tr><td>${fmt(Date.parse(e.time))}</td><td>${e.high ? t('high') : t('low')}</td><td>${nf(e.level, 2)} m</td></tr>`).join('');
+  const st = T.station || {};
+  return `<p class="note"><b>${t('tideStation')}:</b> ${esc(st.name || '–')} · <b>${t('tideDatum')}:</b> ${esc(T.datum || '–')}</p>
+    <p class="note"><b>${t('tideNow')}:</b> ${nf(lvlNow, 2)} m ${trend}</p>
+    <div class="tide"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${t('gezeiten')}">
+      <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+      <line x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="${pad}" y2="${H - pad}" stroke="var(--text)" stroke-width="1.5"/>
+    </svg></div>
+    <table class="t"><thead><tr><th>${t('time')}</th><th></th><th>${esc(T.datum || '')}</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="note">${t('tideNeaps')}</p>`;
+}
+
+/* ---------- Regenradar (RainViewer) ---------- */
+async function loadRadar(force) {
+  if (!mapReady || !S.radarOn || !S.online) return;
+  if (!force && Date.now() - S.radarAt < 5 * 60000) return;
+  try {
+    const j = await fetchJson(CFG.radar, 12000);
+    const frames = (j.radar && j.radar.past) || [];
+    const f = frames[frames.length - 1]; if (!f) throw new Error('no frame');
+    S.radar = { host: j.host, path: f.path, time: f.time * 1000 }; S.radarAt = Date.now(); S.radarErr = false;
+  } catch { S.radarErr = true; }
+  renderRadar();
+}
+function renderRadar() {
+  if (!mapReady) return;
+  if (map.getLayer('radar-l')) map.removeLayer('radar-l');
+  if (map.getSource('radar')) map.removeSource('radar');
+  $('radarInfo').hidden = !S.radarOn;
+  if (!S.radarOn) return;
+  if (!S.radar) { $('radarInfo').textContent = S.radarErr ? t('radarErr') : t('radarNote') + ' …'; return; }
+  map.addSource('radar', { type: 'raster', tiles: [`${S.radar.host}${S.radar.path}/256/{z}/{x}/{y}/2/1_1.png`], tileSize: 256, maxzoom: 12, attribution: 'RainViewer' });
+  // unter Seezeichen und eigenen Layern einordnen, damit Tiefen und Tonnen lesbar bleiben
+  const before = map.getStyle().layers.find(l => l.type === 'symbol' && l.id !== 'radar-l');
+  map.addLayer({ id: 'radar-l', type: 'raster', source: 'radar', paint: { 'raster-opacity': .5, 'raster-fade-duration': 0 } }, before ? before.id : 'track-l');
+  $('radarInfo').textContent = `${t('radarAt')} ${new Date(S.radar.time).toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' })}`;
+}
+setInterval(() => loadRadar(), 5 * 60000);
 
 /* ---------- Windanimation (Partikel über der Karte) ---------- */
 const WF = { cv: null, g: null, grid: null, gridAt: 0, gridKey: '', parts: [], w: 0, h: 0, moving: false, dpr: 1 };
@@ -943,6 +1020,7 @@ function renderChips() {
   a.setAttribute('aria-pressed', S.aisOn);
   $('aisN').textContent = S.aisOn && S.ais.size && mapReady ? shipsInView().length : '';
   $('chipWind').setAttribute('aria-pressed', S.windOn);
+  $('chipRadar').setAttribute('aria-pressed', S.radarOn);
 }
 setInterval(renderStatus, 15000);
 
@@ -1179,6 +1257,7 @@ function pOrt() {
     </form>${res}`;
 }
 function pGezeiten() {
+  if (S.tide) { const h = pTideNeaps(); if (h) return h; }
   const mh = S.marine && S.marine.hourly;
   if (!mh) return `<p class="note">${S.marineErr ? t('tideNone') : t('tideLoading')}</p>`;
   const v = mh.sea_level_height_msl || [], tm = mh.time;
@@ -1217,7 +1296,7 @@ function pInfo() {
     <div class="row">${btn('relayTest', t('relayTest'))}</div>
     ${S.relayTest ? `<p class="note ${S.relayTest.startsWith(t('relayFail')) ? 'err' : ''}">${esc(S.relayTest)}</p>` : ''}
     <h3 style="font:600 17px var(--fc);margin:20px 0 6px">${t('sources')}</h3>
-    <p class="note">${[t('srcChart'), t('srcDepth'), t('srcWx'), t('srcGeo'), t('srcAis')].map(esc).join('<br>')}</p>
+    <p class="note">${[t('srcChart'), t('srcDepth'), t('srcWx'), t('srcTide'), t('srcRadar'), t('srcGeo'), t('srcAis')].map(esc).join('<br>')}</p>
     ${S.aisAttrib ? `<p class="note">${Object.values(S.aisAttrib).map(esc).join('<br>')}</p>` : ''}
     <div class="row">${btn('clearCache', t('clearCache'))}</div>
     <p class="note">Fahrwasser ${CFG.version}</p>`;
@@ -1343,6 +1422,7 @@ $('locBtn').onclick = () => {
   if (S.panel === 'fahrt') renderPanel();
 };
 $('chipAis').onclick = toggleAis;
+$('chipRadar').onclick = () => { S.radarOn = !S.radarOn; store.set('radarOn', S.radarOn); renderChips(); renderRadar(); if (S.radarOn) loadRadar(true); };
 $('chipWind').onclick = () => { S.windOn = !S.windOn; store.set('windOn', S.windOn); renderWind(); renderChips(); windClear(); if (S.windOn) loadField(); };
 $('posBtn').onclick = () => { S.coordFmt = S.coordFmt === 'dm' ? 'dec' : 'dm'; store.set('coordFmt', S.coordFmt); renderStatus(); if (S.panel) renderPanel(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.panel) closePanel(); });
