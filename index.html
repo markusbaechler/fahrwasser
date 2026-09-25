@@ -56,6 +56,12 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .radarinfo button{background:none;border:0;color:var(--text);font-size:14px;padding:2px 6px;min-width:0}
 .radarinfo .dots{display:flex;gap:3px}.radarinfo .dots i{width:6px;height:6px;border-radius:50%;background:var(--line)}.radarinfo .dots i.nc{background:var(--accent);opacity:.4}.radarinfo .dots i.on{background:var(--accent);opacity:1}
 .radarinfo small{color:var(--muted)}
+#rainCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;opacity:.85}
+.simbar{position:absolute;left:10px;right:10px;bottom:10px;z-index:3;display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:4px 10px 4px 4px;font:600 13px var(--fc);font-variant-numeric:tabular-nums}
+.simbar button{background:none;border:0;color:var(--text);font-size:15px;padding:4px 8px;min-width:0}
+.simbar input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
+.simbar span{white-space:nowrap;min-width:9em;text-align:right}
+body.has-sheet .simbar{left:400px}
 #windCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
 select.sel{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);color:var(--text);font:15px var(--fc)}
 .maplibregl-ctrl-scale{background:var(--bg);color:var(--text);border-color:var(--text);font:500 12px var(--fc)}
@@ -133,10 +139,16 @@ label.f{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px}
 <main id="wrap">
   <div id="map"></div>
   <div id="tint"></div>
+  <div class="simbar" id="simBar" hidden>
+    <button type="button" id="simPlay" aria-label="Play">▶</button>
+    <input type="range" id="simRange" min="0" max="71" value="0" step="1" aria-label="Stunde">
+    <span id="simLbl"></span>
+  </div>
   <div class="ov-l">
     <div class="chips">
       <button class="chip" id="chipAis" type="button"><span data-i18n="schiffe"></span><span class="n" id="aisN"></span></button>
       <button class="chip" id="chipWind" type="button"><span data-i18n="wind"></span></button>
+      <button class="chip" id="chipRain" type="button"><span data-i18n="rain"></span></button>
       <button class="chip" id="chipRadar" type="button"><span data-i18n="radar"></span></button>
     </div>
     <div class="note radarinfo" id="radarInfo" hidden></div>
@@ -192,7 +204,7 @@ const CFG = {
   tides: 'https://api.openwaters.io/tides',
   radar: 'https://api.rainviewer.com/public/weather-maps.json',
   aisPollMs: 20000, aisStaleMin: 10, aisDropMin: 30, aisMinZoom: 8,
-  version: '1.5.0'
+  version: '1.6.0'
 };
 
 /* ---------- Speicher (fehlertolerant) ---------- */
@@ -228,7 +240,7 @@ const I18N = {
     searchPh:'Ort, Hafen oder 43.38, 16.21', search:'Suchen', noResults:'Keine Treffer.', searchErr:'Suche fehlgeschlagen.', searching:'Suche …',
     tideNote:'Modellierter Wasserstand relativ zum mittleren Meeresspiegel (Open-Meteo Marine) – keine Pegelstation in der Nähe.', high:'Hoch', low:'Niedrig',
     tideStation:'Pegelstation', tideDatum:'Bezug', tideNeaps:'Gezeitenvorhersage aus harmonischen Konstanten (Neaps, Open Waters). Wetterbedingte Abweichungen (Windstau, Luftdruck) sind nicht enthalten.', tideNow:'Jetzt', rising:'steigend', falling:'fallend',
-    radar:'Radar', radarNote:'Regenradar', radarAt:'Radarbild von', radarErr:'Regenradar nicht verfügbar', nowcast:'Vorhersage',
+    rain:'Regen', simNote:'Vorhersage-Simulation', radar:'Radar', radarNote:'Regenradar', radarAt:'Radarbild von', radarErr:'Regenradar nicht verfügbar', nowcast:'Vorhersage',
     tideNone:'Für diesen Ort gibt es keine Wasserstandsdaten.', tideLoading:'Lade Wasserstand …',
     relay:'Eigenes AIS-Relay (optional)', save:'Speichern', saved:'Gespeichert', sources:'Datenquellen',
     clearCache:'Offline-Karten löschen', cacheCleared:'Offline-Karten gelöscht',
@@ -279,7 +291,7 @@ const I18N = {
     searchPh:'Place, harbour or 43.38, 16.21', search:'Search', noResults:'No results.', searchErr:'Search failed.', searching:'Searching …',
     tideNote:'Modelled water level relative to mean sea level (Open-Meteo Marine) – no tide station nearby.', high:'High', low:'Low',
     tideStation:'Tide station', tideDatum:'Datum', tideNeaps:'Tide prediction from harmonic constituents (Neaps, Open Waters). Weather effects (wind set-up, pressure) are not included.', tideNow:'Now', rising:'rising', falling:'falling',
-    radar:'Radar', radarNote:'Rain radar', radarAt:'Radar image from', radarErr:'Rain radar unavailable', nowcast:'nowcast',
+    rain:'Rain', simNote:'Forecast simulation', radar:'Radar', radarNote:'Rain radar', radarAt:'Radar image from', radarErr:'Rain radar unavailable', nowcast:'nowcast',
     tideNone:'No water level data for this location.', tideLoading:'Loading water level …',
     relay:'Own AIS relay (optional)', save:'Save', saved:'Saved', sources:'Data sources',
     clearCache:'Delete offline charts', cacheCleared:'Offline charts deleted',
@@ -396,7 +408,7 @@ const S = {
   tracking: false, track: store.get('track', []),
   measure: [], route: store.get('route', []), routeSpeed: store.get('routeSpeed', 5),
   ais: new Map(), aisOn: store.get('aisOn', true), aisStatus: 'idle', aisAt: null, relay: store.get('relay', ''), aisAttrib: null,
-  windOn: store.get('windOn', true), radarOn: store.get('radarOn', false), radarPlay: store.get('radarPlay', true), radar: null, radarAt: 0, radarErr: false,
+  windOn: store.get('windOn', true), radarOn: store.get('radarOn', false), rainOn: store.get('rainOn', false), radarPlay: store.get('radarPlay', true), radar: null, radarAt: 0, radarErr: false,
   tide: null, tidePos: null, tideAt: 0, tideErr: false, wxModel: store.get('wxModel', 'best_match'), wx: null, marine: null, wxAt: 0, wxPos: null, wxErr: false, marineErr: false,
   nav: { on: false, wp: 0 }, routeWx: null, routeWxState: 'idle', objs: [], objIdx: 0, relayTest: '',
   selected: null, searchQ: '', searchRes: [], searchState: 'idle', online: navigator.onLine
@@ -566,7 +578,7 @@ map.on('load', () => {
 
   renderTrack(); renderRoute(); renderMeasure(); renderAis(); renderOwn(); renderNav();
   pollAis(); loadWx();
-  windInit(); loadField(); renderRadar(); loadRadar(true);
+  rainInit(); windInit(); loadField(); renderRadar(); loadRadar(true);
 });
 
 map.on('moveend', () => {
@@ -914,7 +926,7 @@ function windInit() {
   $('map').appendChild(WF.cv); WF.g = WF.cv.getContext('2d');
   windResize(); window.addEventListener('resize', windResize);
   map.on('movestart', () => { WF.moving = true; windClear(); });
-  map.on('moveend', () => { WF.moving = false; windClear(); debouncedField(); });
+  map.on('moveend', () => { WF.moving = false; windClear(); rainRender(); debouncedField(); });
   requestAnimationFrame(windFrame);
 }
 function windResize() {
@@ -926,27 +938,107 @@ function windResize() {
   windClear();
 }
 function windClear() { if (WF.g) WF.g.clearRect(0, 0, WF.w, WF.h); WF.parts = []; }
+/* ---------- Wetter-Simulation: Gitter über dem Ausschnitt, 72 h, Stundenregler ---------- */
+const SIM = { data: null, key: '', at: 0, hour: 0, play: false, timer: null, cv: null, g: null, w: 0, h: 0 };
 async function loadField() {
-  if (!mapReady || !S.windOn || !S.online) return;
-  const b = map.getBounds(), NX = 7, NY = 5, W = b.getWest(), E = b.getEast(), So = b.getSouth(), N = b.getNorth();
+  if (!mapReady || !(S.windOn || S.rainOn) || !S.online) return;
+  const b = map.getBounds(), NX = 10, NY = 7, W = b.getWest(), E = b.getEast(), So = b.getSouth(), N = b.getNorth();
   const key = [W, So, E, N].map(v => v.toFixed(2)).join(',') + '|' + S.wxModel;
-  if (key === WF.gridKey && Date.now() - WF.gridAt < 15 * 60000) return;
+  if (key === SIM.key && Date.now() - SIM.at < 30 * 60000) { simApply(); return; }
   const lats = [], lons = [];
   for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) {
     lons.push(+(W + (E - W) * i / (NX - 1)).toFixed(3)); lats.push(+(So + (N - So) * j / (NY - 1)).toFixed(3));
   }
   try {
-    const r = await fetchJson(`${CFG.meteo}?latitude=${lats.join(',')}&longitude=${lons.join(',')}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn${modelQ()}`);
+    const r = await fetchJson(`${CFG.meteo}?latitude=${lats.join(',')}&longitude=${lons.join(',')}&hourly=wind_speed_10m,wind_direction_10m,precipitation&forecast_days=3&timezone=auto&wind_speed_unit=kn${modelQ()}`, 20000);
     const arr = Array.isArray(r) ? r : [r];
     if (arr.length !== NX * NY) throw new Error('grid');
-    // u = Ost-, v = Nord-Komponente der Windbewegung (Richtung, wohin er weht)
-    const pts = arr.map((d, k) => {
-      const kn = d.current.wind_speed_10m, to = rad((d.current.wind_direction_10m + 180) % 360);
-      return { u: kn * Math.sin(to), v: kn * Math.cos(to), kn };
-    });
-    WF.grid = { nx: NX, ny: NY, W, E, S: So, N, pts };
-    WF.gridKey = key; WF.gridAt = Date.now(); windClear();
-  } catch { /* Animation bleibt einfach aus */ }
+    const times = arr[0].hourly.time;
+    const pts = arr.map(d => ({ kn: d.hourly.wind_speed_10m, dir: d.hourly.wind_direction_10m, pr: d.hourly.precipitation }));
+    const nowStr = new Date(Date.now() + (arr[0].utc_offset_seconds || 0) * 1000).toISOString().slice(0, 13) + ':00';
+    const i0 = Math.max(0, times.findIndex(x => x >= nowStr));
+    const keep = SIM.data && SIM.data.times[SIM.hour];
+    SIM.data = { nx: NX, ny: NY, W, E, S: So, N, times, pts, i0 };
+    SIM.key = key; SIM.at = Date.now();
+    const same = keep ? times.indexOf(keep) : -1;
+    SIM.hour = same >= 0 ? same : i0;
+    simApply();
+  } catch { /* Simulation bleibt aus */ }
+}
+function simApply() {
+  const D = SIM.data; if (!D) return;
+  const h = SIM.hour;
+  // Windfeld für die gewählte Stunde
+  WF.grid = { nx: D.nx, ny: D.ny, W: D.W, E: D.E, S: D.S, N: D.N, pts: D.pts.map(p => {
+    const kn = p.kn[h] ?? 0, to = rad(((p.dir[h] ?? 0) + 180) % 360);
+    return { u: kn * Math.sin(to), v: kn * Math.cos(to), kn };
+  }) };
+  windClear(); rainRender(); simBarRender();
+}
+/* Regenfeld */
+const RAIN_STOPS = [[0.1, [150, 190, 240, .35]], [0.5, [90, 140, 230, .55]], [1, [40, 100, 220, .65]], [2, [30, 170, 90, .7]], [5, [200, 220, 40, .75]], [10, [240, 150, 30, .8]], [20, [220, 50, 40, .85]], [40, [150, 20, 120, .9]]];
+function rainColor(mm) {
+  if (!(mm >= 0.1)) return null;
+  let prev = RAIN_STOPS[0];
+  for (const st of RAIN_STOPS) {
+    if (mm <= st[0]) {
+      const f = st === prev ? 1 : (mm - prev[0]) / (st[0] - prev[0]);
+      return prev[1].map((v, i) => v + (st[1][i] - v) * f);
+    }
+    prev = st;
+  }
+  return prev[1];
+}
+function rainAt(lng, lat) {
+  const D = SIM.data, h = SIM.hour;
+  const fx = Math.min(D.nx - 1, Math.max(0, (lng - D.W) / (D.E - D.W) * (D.nx - 1)));
+  const fy = Math.min(D.ny - 1, Math.max(0, (lat - D.S) / (D.N - D.S) * (D.ny - 1)));
+  const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(D.nx - 1, x0 + 1), y1 = Math.min(D.ny - 1, y0 + 1), tx = fx - x0, ty = fy - y0;
+  const p = (x, y) => D.pts[y * D.nx + x].pr[h] ?? 0;
+  return (p(x0, y0) * (1 - tx) + p(x1, y0) * tx) * (1 - ty) + (p(x0, y1) * (1 - tx) + p(x1, y1) * tx) * ty;
+}
+function rainInit() {
+  SIM.cv = document.createElement('canvas'); SIM.cv.id = 'rainCv';
+  $('map').appendChild(SIM.cv); SIM.g = SIM.cv.getContext('2d');
+  rainResize(); window.addEventListener('resize', rainResize);
+  map.on('move', () => { if (S.rainOn && SIM.data) rainRender(true); });
+}
+function rainResize() { const r = $('map').getBoundingClientRect(); SIM.w = r.width; SIM.h = r.height; SIM.cv.width = r.width; SIM.cv.height = r.height; rainRender(); }
+let rainOff = null;
+function rainRender(coarse) {
+  if (!SIM.g) return;
+  SIM.g.clearRect(0, 0, SIM.w, SIM.h);
+  if (!S.rainOn || !SIM.data) return;
+  const step = coarse ? 14 : 6, cw = Math.ceil(SIM.w / step), ch = Math.ceil(SIM.h / step);
+  if (!rainOff) rainOff = document.createElement('canvas');
+  rainOff.width = cw; rainOff.height = ch;
+  const og = rainOff.getContext('2d'), img = og.createImageData(cw, ch), d = img.data;
+  for (let j = 0; j < ch; j++) for (let i = 0; i < cw; i++) {
+    const ll = map.unproject([(i + .5) * step, (j + .5) * step]);
+    const c = rainColor(rainAt(ll.lng, ll.lat)); if (!c) continue;
+    const o = (j * cw + i) * 4; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = c[3] * 255;
+  }
+  og.putImageData(img, 0, 0);
+  SIM.g.imageSmoothingEnabled = true; SIM.g.imageSmoothingQuality = 'high';
+  SIM.g.drawImage(rainOff, 0, 0, cw, ch, 0, 0, cw * step, ch * step);
+}
+/* Zeitleiste */
+function simBarRender() {
+  const on = (S.windOn || S.rainOn) && SIM.data;
+  $('simBar').hidden = !on; if (!on) return;
+  const D = SIM.data, r = $('simRange');
+  r.min = D.i0; r.max = D.times.length - 1; r.value = SIM.hour;
+  const dt = new Date(D.times[SIM.hour]);
+  const rel = SIM.hour - D.i0;
+  $('simLbl').textContent = `${dt.toLocaleDateString(loc(), { weekday: 'short' })} ${dt.toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' })}` + (rel ? ` (+${rel} h)` : '');
+  $('simPlay').textContent = SIM.play ? '❚❚' : '▶';
+  $('simPlay').setAttribute('aria-label', SIM.play ? 'Pause' : 'Play');
+}
+function simSetHour(h) { SIM.hour = Math.max(SIM.data.i0, Math.min(SIM.data.times.length - 1, h)); simApply(); }
+function simPlayToggle() {
+  SIM.play = !SIM.play; clearInterval(SIM.timer); SIM.timer = null;
+  if (SIM.play) SIM.timer = setInterval(() => { if (document.hidden || !SIM.data) return; simSetHour(SIM.hour + 1 > SIM.data.times.length - 1 ? SIM.data.i0 : SIM.hour + 1); }, 800);
+  simBarRender();
 }
 const debouncedField = debounce(loadField, 2500);
 function windAt(lng, lat) {
@@ -1045,6 +1137,7 @@ function renderChips() {
   $('aisN').textContent = S.aisOn && S.ais.size && mapReady ? shipsInView().length : '';
   $('chipWind').setAttribute('aria-pressed', S.windOn);
   $('chipRadar').setAttribute('aria-pressed', S.radarOn);
+  $('chipRain').setAttribute('aria-pressed', S.rainOn);
 }
 setInterval(renderStatus, 15000);
 
@@ -1393,7 +1486,7 @@ $('sheetBody').addEventListener('click', e => {
 $('sheetBody').addEventListener('change', e => {
   if (e.target.dataset.input === 'wxModel') {
     S.wxModel = WX_MODELS.includes(e.target.value) ? e.target.value : 'best_match'; store.set('wxModel', S.wxModel);
-    S.wxAt = 0; S.routeWx = null; S.routeWxState = 'idle'; WF.gridKey = '';
+    S.wxAt = 0; S.routeWx = null; S.routeWxState = 'idle'; SIM.key = '';
     loadWx(true); loadField(); toast(t('saved'));
   }
   if (e.target.dataset.input === 'speed') {
@@ -1446,8 +1539,11 @@ $('locBtn').onclick = () => {
   if (S.panel === 'fahrt') renderPanel();
 };
 $('chipAis').onclick = toggleAis;
+$('chipRain').onclick = () => { S.rainOn = !S.rainOn; store.set('rainOn', S.rainOn); renderChips(); rainRender(); simBarRender(); if (S.rainOn) loadField(); };
+$('simPlay').onclick = simPlayToggle;
+$('simRange').oninput = e => simSetHour(+e.target.value);
 $('chipRadar').onclick = () => { S.radarOn = !S.radarOn; store.set('radarOn', S.radarOn); renderChips(); renderRadar(); if (S.radarOn) loadRadar(true); };
-$('chipWind').onclick = () => { S.windOn = !S.windOn; store.set('windOn', S.windOn); renderWind(); renderChips(); windClear(); if (S.windOn) loadField(); };
+$('chipWind').onclick = () => { S.windOn = !S.windOn; store.set('windOn', S.windOn); renderWind(); renderChips(); windClear(); simBarRender(); if (S.windOn) loadField(); };
 $('posBtn').onclick = () => { S.coordFmt = S.coordFmt === 'dm' ? 'dec' : 'dm'; store.set('coordFmt', S.coordFmt); renderStatus(); if (S.panel) renderPanel(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.panel) closePanel(); });
 addEventListener('online', () => { S.online = true; renderStatus(); toast(t('online')); pollAis(); loadWx(true); });
