@@ -1,3 +1,4 @@
+# Fahrwasser AIS-Relay
 name = "fahrwasser-ais"
 main = "ais-relay-worker.js"
 compatibility_date = "2025-06-01"
