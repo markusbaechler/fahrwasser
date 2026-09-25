@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="de" data-mode="day">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2536">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Fahrwasser">
+<meta name="description" content="Seekarte mit offenen Daten: Tiefen, Seezeichen, AIS, Wetter und Wasserstand.">
+<meta property="og:title" content="Fahrwasser">
+<meta property="og:description" content="Seekarte mit offenen Daten: Tiefen, Seezeichen, AIS, Wetter und Wasserstand.">
+<title>Fahrwasser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<style>
+:root{
+  --bg:#0F2536; --bg2:#163246; --line:#2A4A61; --text:#EEF3F5; --muted:#93A9B8;
+  --accent:#F2B705; --on-accent:#1C1600; --own:#E8175D; --ok:#3FB56E; --err:#E5484D;
+  --r:10px;
+  --f:'Barlow',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --fc:'Barlow Semi Condensed','Barlow',system-ui,-apple-system,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+[data-mode=dusk]{--bg:#0B1B28;--bg2:#10273A;--line:#22405A;--text:#C9D5DC;--muted:#7C93A3;--accent:#C9980A}
+/* Nacht: ausschliesslich Rot auf Schwarz, schützt die Dunkeladaption */
+[data-mode=night]{--bg:#000;--bg2:#0A0000;--line:#330000;--text:#C21A1A;--muted:#7A0E0E;--accent:#8E0F0F;--on-accent:#000;--own:#C21A1A;--ok:#8E0F0F;--err:#C21A1A}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.4 var(--f);display:grid;grid-template-rows:auto 1fr auto auto;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+.bar{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 14px;border-bottom:1px solid var(--line)}
+.brand{font:600 21px/1 var(--fc);letter-spacing:.01em;margin-right:auto}
+.btn{min-height:44px;padding:0 14px;border:1px solid var(--line);background:var(--bg2);border-radius:var(--r);display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;font-weight:500;font-size:15px}
+.btn[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.sq{width:48px;height:48px;padding:0}
+.btn.wide{flex:1}
+
+#wrap{position:relative;min-height:0}
+#map{position:absolute;inset:0;background:var(--bg)}
+#tint{position:absolute;inset:0;pointer-events:none;background:#f00;mix-blend-mode:multiply;display:none;z-index:1}
+[data-mode=night] #tint{display:block}
+[data-mode=dusk] #map canvas{filter:invert(1) hue-rotate(180deg) brightness(.9) saturate(.85)}
+[data-mode=night] #map canvas{filter:grayscale(1) invert(1) brightness(.6) contrast(1.2)}
+#map.tool canvas{cursor:crosshair}
+.maplibregl-ctrl-scale{background:var(--bg);color:var(--text);border-color:var(--text);font:500 12px var(--fc)}
+.maplibregl-ctrl-attrib{background:var(--bg)!important;color:var(--muted)}
+.maplibregl-ctrl-attrib a{color:var(--muted)}
+.maplibregl-ctrl-attrib-button{filter:invert(1)}
+
+.ov-l{position:absolute;top:10px;left:10px;z-index:2;display:flex;flex-direction:column;gap:8px;align-items:flex-start;transition:left .2s}
+.ov-r{position:absolute;top:10px;right:10px;z-index:2;display:flex;flex-direction:column;gap:8px}
+.chips{display:flex;gap:6px}
+.chip{min-height:40px;padding:0 12px;border-radius:20px;border:1px solid var(--line);background:var(--bg);cursor:pointer;display:inline-flex;align-items:center;gap:6px;font:500 14px var(--f)}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.chip .n{font:600 14px var(--fc);font-variant-numeric:tabular-nums}
+.wind{display:grid;grid-template-columns:auto auto;column-gap:10px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:6px 12px 7px 8px}
+.wind svg{grid-row:span 2;width:30px;height:30px;transition:transform .4s}
+.wind .v{font:600 26px/1.05 var(--fc);font-variant-numeric:tabular-nums}
+.wind .v small{font-size:14px;font-weight:500;color:var(--muted);margin-left:3px}
+.wind .s{font-size:13px;color:var(--muted)}
+.toast{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);z-index:5;background:var(--bg);border:1px solid var(--line);padding:10px 14px;border-radius:var(--r);width:max-content;max-width:min(92%,420px);font-size:14px}
+
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:4;max-height:60%;overflow:auto;overscroll-behavior:contain;background:var(--bg);border-top:1px solid var(--line);border-radius:14px 14px 0 0;padding:0 16px 16px}
+.sheet-head{display:flex;align-items:center;gap:8px;position:sticky;top:0;background:var(--bg);padding:10px 0 8px;z-index:1}
+.sheet-head h2{font:600 21px var(--fc);margin:0 auto 0 0}
+@media (min-width:900px){
+  .sheet{top:10px;bottom:10px;left:10px;right:auto;width:380px;max-height:none;border:1px solid var(--line);border-radius:14px}
+  body.has-sheet .ov-l{left:400px}
+}
+.readout{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 12px}
+.readout div{border:1px solid var(--line);border-radius:var(--r);padding:8px 12px}
+.readout b{display:block;font:600 38px/1 var(--fc);font-variant-numeric:tabular-nums}
+.readout b small{font-size:16px;font-weight:500;color:var(--muted);margin-left:4px}
+.readout span{font-size:13px;color:var(--muted)}
+dl.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:8px 0;font-size:15px}
+dl.kv dt{color:var(--muted)}
+dl.kv dd{margin:0;font-family:var(--fc);font-weight:500;font-variant-numeric:tabular-nums;text-align:right}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.note{color:var(--muted);font-size:14px;margin:8px 0}
+.err{color:var(--err)}
+table.t{width:100%;border-collapse:collapse;font:500 15px var(--fc);font-variant-numeric:tabular-nums}
+table.t th{color:var(--muted);font-weight:500;text-align:right;padding:4px 4px 6px;border-bottom:1px solid var(--line)}
+table.t td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--line)}
+table.t th:first-child,table.t td:first-child{text-align:left}
+.arr{display:inline-block;width:14px;height:14px;vertical-align:-2px}
+.list{list-style:none;margin:0;padding:0}
+.list button{width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 2px;cursor:pointer;display:flex;gap:12px;align-items:baseline}
+.list .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.list .mt{color:var(--muted);font:500 14px var(--fc);font-variant-numeric:tabular-nums;white-space:nowrap}
+.list .old .nm{color:var(--muted)}
+.menu{display:grid;gap:8px;margin-top:4px}
+.menu .btn{justify-content:flex-start;min-height:52px}
+input[type=text],input[type=url],input[type=number]{min-height:44px;width:100%;padding:0 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg2)}
+form.inline{display:flex;gap:8px}
+label.f{display:block;font-size:14px;color:var(--muted);margin:12px 0 6px}
+.tide svg{width:100%;height:auto;display:block;margin:6px 0}
+
+.status{display:flex;align-items:center;gap:10px;padding:4px 12px;min-height:40px;border-top:1px solid var(--line);font:500 15px var(--fc);font-variant-numeric:tabular-nums}
+.status .pos{background:none;border:0;padding:6px 0;cursor:pointer;margin-left:auto;white-space:nowrap}
+.status .acc{color:var(--muted);min-width:4.5em;text-align:right;white-space:nowrap}
+.status .off{color:var(--err)}
+.tabs{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--line)}
+.tab{position:relative;background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:58px;cursor:pointer;font-size:13px;font-weight:500}
+.tab[aria-current=true]{color:var(--accent)}
+.tab[aria-current=true]::before{content:"";position:absolute;top:-1px;left:22%;right:22%;height:3px;background:var(--accent);border-radius:0 0 3px 3px}
+@media (max-width:360px){.tab span{font-size:11px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="bar">
+  <span class="brand">Fahrwasser</span>
+  <button class="btn" id="modeBtn" type="button"><span id="modeIco"></span><span id="modeLbl"></span></button>
+  <button class="btn" id="langBtn" type="button">EN</button>
+</header>
+
+<main id="wrap">
+  <div id="map"></div>
+  <div id="tint"></div>
+  <div class="ov-l">
+    <div class="chips">
+      <button class="chip" id="chipAis" type="button"><span data-i18n="schiffe"></span><span class="n" id="aisN"></span></button>
+      <button class="chip" id="chipWind" type="button"><span data-i18n="wind"></span></button>
+    </div>
+    <div class="wind" id="wind" hidden>
+      <svg viewBox="0 0 24 24" id="windArr"><path d="M12 3v18M6 15l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="v" id="windV">–</div>
+      <div class="s" id="windS"></div>
+    </div>
+  </div>
+  <div class="ov-r">
+    <button class="btn sq" id="zIn" type="button"></button>
+    <button class="btn sq" id="zOut" type="button"></button>
+    <button class="btn sq" id="locBtn" type="button"></button>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <section class="sheet" id="sheet" hidden aria-labelledby="sheetTitle">
+    <div class="sheet-head">
+      <button class="btn sq" id="backBtn" type="button" hidden></button>
+      <h2 id="sheetTitle"></h2>
+      <button class="btn sq" id="closeBtn" type="button"></button>
+    </div>
+    <div id="sheetBody"></div>
+  </section>
+</main>
+
+<footer class="status">
+  <span id="clock"></span>
+  <button class="pos" id="posBtn" type="button"></button>
+  <span class="acc" id="acc"></span>
+</footer>
+
+<nav class="tabs" id="tabs">
+  <button class="tab" data-tab="fahrt" type="button"></button>
+  <button class="tab" data-tab="messen" type="button"></button>
+  <button class="tab" data-tab="route" type="button"></button>
+  <button class="tab" data-tab="schiffe" type="button"></button>
+  <button class="tab" data-tab="wetter" type="button"></button>
+  <button class="tab" data-tab="mehr" type="button"></button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script>
+'use strict';
+
+/* ---------- Konfiguration ---------- */
+const CFG = {
+  style: 'https://tiles.openwaters.io/seamap/style.json',
+  start: { center: [16.2083, 43.3867], zoom: 11 },
+  meteo: 'https://api.open-meteo.com/v1/forecast',
+  marine: 'https://marine-api.open-meteo.com/v1/marine',
+  geocode: 'https://nominatim.openstreetmap.org/search',
+  aisPollMs: 20000, aisStaleMin: 10, aisDropMin: 30, aisMinZoom: 8,
+  version: '1.0.0'
+};
+
+/* ---------- Speicher (fehlertolerant) ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('fw:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('fw:' + k, JSON.stringify(v)); } catch {} }
+};
+
+/* ---------- Texte ---------- */
+const I18N = {
+  de: {
+    fahrt:'Fahrt', messen:'Messen', route:'Route', schiffe:'Schiffe', wetter:'Wetter', mehr:'Mehr',
+    ort:'Ort suchen', gezeiten:'Wasserstand', info:'Info & Einstellungen', ship:'Schiff',
+    mode_day:'Tag', mode_dusk:'Dämmerung', mode_night:'Nacht', modeNext:'Wechseln zu',
+    wind:'Wind', from:'aus', gusts:'Böen', waves:'Wellen', center:'Mitte', close:'Schliessen', back:'Zurück',
+    zoomIn:'Hineinzoomen', zoomOut:'Herauszoomen', locate:'Eigene Position',
+    gpsStart:'GPS starten', gpsStop:'GPS stoppen', follow:'Karte folgt', position:'Position', accuracy:'Genauigkeit',
+    lastFix:'Letzter Fix', noFix:'Noch keine Position. Starte das GPS.', utc:'UTC',
+    trackRec:'Track aufzeichnen', trackStop:'Aufzeichnung stoppen', track:'Track', points:'Punkte',
+    gpx:'Als GPX speichern', clear:'Löschen',
+    measureHint:'Tippe zwei Punkte auf die Karte.', measureNext:'Tippe den zweiten Punkt.', measureFromOwn:'Ab eigener Position',
+    distance:'Distanz', course:'Kurs rw', reverse:'Gegenkurs', newMeasure:'Neu messen',
+    routeHint:'Tippe auf die Karte, um Wegpunkte zu setzen.', total:'Gesamt', speed:'Geplante Fahrt (kn)',
+    duration:'Dauer', eta:'Ankunft', undo:'Letzten entfernen', reverseRoute:'Umkehren', wp:'WP',
+    aisOn:'Schiffe anzeigen', aisNoRelay:'AIS ist noch nicht eingerichtet. Trage unter Mehr › Info die Adresse deines AIS-Relays ein.',
+    aisZoom:'Zoome näher heran, um Schiffe zu laden.', aisLoading:'Lade Schiffe …', aisError:'AIS-Relay nicht erreichbar',
+    aisNotCfg:'Das Relay hat keinen API-Key hinterlegt.', aisOk:'Aktualisiert', aisNone:'Keine Schiffe im Ausschnitt.',
+    inView:'im Ausschnitt', older:'älter als', greyed:'grau', minutes:'min',
+    sog:'Fahrt über Grund', cog:'Kurs über Grund', hdg:'Steuerkurs', dest:'Ziel', type:'Typ', mmsi:'MMSI', len:'Länge',
+    status:'Status', seen:'Letzte Meldung', ago:'vor', justNow:'gerade eben', distFrom:'Distanz',
+    wxLoading:'Lade Wetter …', wxError:'Wetter nicht verfügbar. Prüfe die Verbindung.', wxAt:'Open-Meteo, Stand', wxFor:'für die Kartenmitte',
+    time:'Zeit', rain:'Regen', now:'Jetzt', refresh:'Aktualisieren',
+    searchPh:'Ort, Hafen oder 43.38, 16.21', search:'Suchen', noResults:'Keine Treffer.', searchErr:'Suche fehlgeschlagen.', searching:'Suche …',
+    tideNote:'Modellierter Wasserstand relativ zum mittleren Meeresspiegel (Open-Meteo Marine).', high:'Hoch', low:'Niedrig',
+    tideNone:'Für diesen Ort gibt es keine Wasserstandsdaten.', tideLoading:'Lade Wasserstand …',
+    relay:'AIS-Relay-Adresse', save:'Speichern', saved:'Gespeichert', sources:'Datenquellen',
+    clearCache:'Offline-Karten löschen', cacheCleared:'Offline-Karten gelöscht',
+    offline:'Offline: Die Karte zeigt nur bereits geladene Bereiche.', online:'Wieder online',
+    gpsDenied:'Standortzugriff verweigert. Erlaube ihn in den Browser-Einstellungen.', gpsNone:'Dieses Gerät liefert keine Position.',
+    mapFail:'Die Kartenbibliothek konnte nicht geladen werden. Prüfe die Verbindung und lade neu.',
+    srcChart:'Seekarte: Open Waters Seamap (CC BY 4.0), Daten © OpenStreetMap-Mitwirkende',
+    srcDepth:'Tiefen: Open Waters Seascape, globale offene Bathymetrie',
+    srcWx:'Wetter, Wellen, Wasserstand: Open-Meteo (CC BY 4.0)',
+    srcGeo:'Ortssuche: Nominatim, © OpenStreetMap-Mitwirkende',
+    srcAis:'AIS: aisstream.io über dein eigenes Relay',
+    relayHelp:'Die Adresse deines Cloudflare Workers, z.B. https://fahrwasser-ais.deinname.workers.dev'
+  },
+  en: {
+    fahrt:'Voyage', messen:'Measure', route:'Route', schiffe:'Ships', wetter:'Weather', mehr:'More',
+    ort:'Find place', gezeiten:'Water level', info:'Info & settings', ship:'Vessel',
+    mode_day:'Day', mode_dusk:'Dusk', mode_night:'Night', modeNext:'Switch to',
+    wind:'Wind', from:'from', gusts:'Gusts', waves:'Waves', center:'Centre', close:'Close', back:'Back',
+    zoomIn:'Zoom in', zoomOut:'Zoom out', locate:'My position',
+    gpsStart:'Start GPS', gpsStop:'Stop GPS', follow:'Follow', position:'Position', accuracy:'Accuracy',
+    lastFix:'Last fix', noFix:'No position yet. Start the GPS.', utc:'UTC',
+    trackRec:'Record track', trackStop:'Stop recording', track:'Track', points:'points',
+    gpx:'Save as GPX', clear:'Clear',
+    measureHint:'Tap two points on the chart.', measureNext:'Tap the second point.', measureFromOwn:'From my position',
+    distance:'Distance', course:'True course', reverse:'Reciprocal', newMeasure:'Measure again',
+    routeHint:'Tap the chart to add waypoints.', total:'Total', speed:'Planned speed (kn)',
+    duration:'Duration', eta:'Arrival', undo:'Remove last', reverseRoute:'Reverse', wp:'WP',
+    aisOn:'Show ships', aisNoRelay:'AIS is not set up yet. Enter your AIS relay address under More › Info.',
+    aisZoom:'Zoom in to load ships.', aisLoading:'Loading ships …', aisError:'AIS relay unreachable',
+    aisNotCfg:'The relay has no API key configured.', aisOk:'Updated', aisNone:'No ships in view.',
+    inView:'in view', older:'older than', greyed:'greyed out', minutes:'min',
+    sog:'Speed over ground', cog:'Course over ground', hdg:'Heading', dest:'Destination', type:'Type', mmsi:'MMSI', len:'Length',
+    status:'Status', seen:'Last report', ago:'', justNow:'just now', distFrom:'Distance',
+    wxLoading:'Loading weather …', wxError:'Weather unavailable. Check your connection.', wxAt:'Open-Meteo, as of', wxFor:'for the chart centre',
+    time:'Time', rain:'Rain', now:'Now', refresh:'Refresh',
+    searchPh:'Place, harbour or 43.38, 16.21', search:'Search', noResults:'No results.', searchErr:'Search failed.', searching:'Searching …',
+    tideNote:'Modelled water level relative to mean sea level (Open-Meteo Marine).', high:'High', low:'Low',
+    tideNone:'No water level data for this location.', tideLoading:'Loading water level …',
+    relay:'AIS relay address', save:'Save', saved:'Saved', sources:'Data sources',
+    clearCache:'Delete offline charts', cacheCleared:'Offline charts deleted',
+    offline:'Offline: the chart only shows areas loaded earlier.', online:'Back online',
+    gpsDenied:'Location access denied. Allow it in your browser settings.', gpsNone:'This device provides no position.',
+    mapFail:'The map library could not be loaded. Check your connection and reload.',
+    srcChart:'Chart: Open Waters Seamap (CC BY 4.0), data © OpenStreetMap contributors',
+    srcDepth:'Depths: Open Waters Seascape, global open bathymetry',
+    srcWx:'Weather, waves, water level: Open-Meteo (CC BY 4.0)',
+    srcGeo:'Place search: Nominatim, © OpenStreetMap contributors',
+    srcAis:'AIS: aisstream.io via your own relay',
+    relayHelp:'Your Cloudflare Worker address, e.g. https://fahrwasser-ais.yourname.workers.dev'
+  }
+};
+const COMPASS = {
+  de: ['N','NNO','NO','ONO','O','OSO','SO','SSO','S','SSW','SW','WSW','W','WNW','NW','NNW'],
+  en: ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']
+};
+const NAVSTAT = {
+  de: {0:'In Fahrt (Motor)',1:'Vor Anker',2:'Manövrierunfähig',3:'Manövrierbehindert',5:'Festgemacht',7:'Fischend',8:'Unter Segeln'},
+  en: {0:'Under way (engine)',1:'At anchor',2:'Not under command',3:'Restricted manoeuvrability',5:'Moored',7:'Fishing',8:'Under sail'}
+};
+function shipType(c) {
+  if (c == null) return null;
+  const de = lang === 'de';
+  if (c === 30) return de ? 'Fischerei' : 'Fishing';
+  if (c === 31 || c === 32 || c === 52) return de ? 'Schlepper' : 'Tug';
+  if (c === 35) return de ? 'Militär' : 'Military';
+  if (c === 36) return de ? 'Segelboot' : 'Sailing';
+  if (c === 37) return de ? 'Sportboot' : 'Pleasure craft';
+  if (c >= 40 && c <= 49) return de ? 'Schnellfähre' : 'High-speed craft';
+  if (c === 50) return de ? 'Lotse' : 'Pilot';
+  if (c === 51) return de ? 'Seenotrettung' : 'Search and rescue';
+  if (c >= 60 && c <= 69) return de ? 'Passagierschiff' : 'Passenger';
+  if (c >= 70 && c <= 79) return de ? 'Frachter' : 'Cargo';
+  if (c >= 80 && c <= 89) return de ? 'Tanker' : 'Tanker';
+  return de ? 'Andere' : 'Other';
+}
+
+/* ---------- Icons ---------- */
+const P = {
+  fahrt:'<path d="M3 11l18-8-8 18-2-8z"/>',
+  messen:'<path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>',
+  route:'<circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 000-6H9a3 3 0 010-6h6.5"/>',
+  schiffe:'<path d="M4 15l1.5 5h13L20 15z"/><path d="M6 15V9h12v6M9 9V5h6v4"/>',
+  wetter:'<path d="M7 16a4 4 0 01.5-8 5.5 5.5 0 0110.5 1.5A3.5 3.5 0 0117.5 16z"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/>',
+  mehr:'<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', minus:'<path d="M5 12h14"/>',
+  loc:'<circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/>',
+  day:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  dusk:'<path d="M17 18a5 5 0 00-10 0M12 3v6M8.5 6.5L12 9l3.5-2.5M2 18h2M20 18h2M3 22h18M4.9 12.9l1.4 1.4M17.7 14.3l1.4-1.4"/>',
+  night:'<path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>', back:'<path d="M15 5l-7 7 7 7"/>',
+  ort:'<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/>',
+  gezeiten:'<path d="M2 12c2.5-3 5-3 7.5 0s5 3 7.5 0 3.5-2 5-1M2 18c2.5-3 5-3 7.5 0s5 3 7.5 0 3.5-2 5-1"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'
+};
+const ico = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+
+/* ---------- Zustand ---------- */
+let lang = store.get('lang', (navigator.language || 'de').toLowerCase().startsWith('en') ? 'en' : 'de');
+const t = k => I18N[lang][k] ?? I18N.de[k] ?? k;
+const S = {
+  mode: store.get('mode', 'day'), coordFmt: store.get('coordFmt', 'dm'),
+  panel: null, tool: null,
+  own: null, follow: false, watchId: null,
+  tracking: false, track: store.get('track', []),
+  measure: [], route: store.get('route', []), routeSpeed: store.get('routeSpeed', 5),
+  ais: new Map(), aisOn: store.get('aisOn', true), aisStatus: 'idle', aisAt: null, relay: store.get('relay', ''),
+  windOn: store.get('windOn', true), wx: null, marine: null, wxAt: 0, wxPos: null, wxErr: false, marineErr: false,
+  selected: null, searchQ: '', searchRes: [], searchState: 'idle', online: navigator.onLine
+};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const loc = () => lang === 'de' ? 'de-CH' : 'en-GB';
+const nf = (v, d = 1) => (v == null || !isFinite(v)) ? '–' : v.toLocaleString(loc(), { minimumFractionDigits: d, maximumFractionDigits: d });
+const deg3 = v => (v == null || !isFinite(v)) ? '–' : String(Math.round(v) % 360).padStart(3, '0') + '°';
+const debounce = (fn, ms) => { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; };
+
+/* ---------- Geodäsie ---------- */
+const R_NM = 3440.065, rad = d => d * Math.PI / 180, dg = r => r * 180 / Math.PI;
+function distNm(a, b) {
+  const h = Math.sin(rad(b[1] - a[1]) / 2) ** 2 + Math.cos(rad(a[1])) * Math.cos(rad(b[1])) * Math.sin(rad(b[0] - a[0]) / 2) ** 2;
+  return 2 * R_NM * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function bearing(a, b) {
+  const p1 = rad(a[1]), p2 = rad(b[1]), dl = rad(b[0] - a[0]);
+  return (dg(Math.atan2(Math.sin(dl) * Math.cos(p2), Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl))) + 360) % 360;
+}
+function destPt(p, brg, nm) {
+  const d = nm / R_NM, th = rad(brg), p1 = rad(p[1]), l1 = rad(p[0]);
+  const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(th));
+  const l2 = l1 + Math.atan2(Math.sin(th) * Math.sin(d) * Math.cos(p1), Math.cos(d) - Math.sin(p1) * Math.sin(p2));
+  return [dg(l2), dg(p2)];
+}
+const pathNm = pts => pts.reduce((s, p, i) => i ? s + distNm(pts[i - 1], p) : 0, 0);
+const BFT = [1, 4, 7, 11, 17, 22, 28, 34, 41, 48, 56, 64];
+const bft = kn => { let i = 0; while (i < 12 && kn >= BFT[i]) i++; return i; };
+const compass = d => COMPASS[lang][Math.round((((d % 360) + 360) % 360) / 22.5) % 16];
+
+function fmtCoord(v, isLat) {
+  const hem = isLat ? (v >= 0 ? 'N' : 'S') : (v >= 0 ? 'E' : 'W');
+  const a = Math.abs(v);
+  if (S.coordFmt === 'dec') return `${a.toFixed(4)}° ${hem}`;
+  let d = Math.floor(a), m = (a - d) * 60;
+  if (+m.toFixed(1) >= 60) { d++; m = 0; }
+  return `${String(d).padStart(isLat ? 2 : 3, '0')}°${m.toFixed(1).padStart(4, '0')}′ ${hem}`;
+}
+const fmtPos = p => `${fmtCoord(p[1], true)}  ${fmtCoord(p[0], false)}`;
+function fmtAge(ms) {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 20) return t('justNow');
+  const txt = s < 120 ? `${s} s` : s < 7200 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`;
+  return lang === 'de' ? `vor ${txt}` : `${txt} ago`;
+}
+function fmtDur(h) {
+  if (!isFinite(h)) return '–';
+  const m = Math.round(h * 60);
+  return `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+}
+
+/* ---------- Netzwerk ---------- */
+async function fetchJson(url, ms = 15000) {
+  const ctl = new AbortController(); const h = setTimeout(() => ctl.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: ctl.signal });
+    if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; try { e.body = await r.json(); } catch {} throw e; }
+    return await r.json();
+  } finally { clearTimeout(h); }
+}
+
+/* ---------- UI-Grundlagen ---------- */
+let toastT;
+function toast(msg, ms = 3500) {
+  const el = $('toast'); el.textContent = msg; el.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, ms);
+}
+const MODES = ['day', 'dusk', 'night'];
+const THEME = { day: '#0F2536', dusk: '#0B1B28', night: '#000000' };
+function applyMode() {
+  document.documentElement.dataset.mode = S.mode;
+  document.querySelector('meta[name=theme-color]').content = THEME[S.mode];
+  $('modeIco').innerHTML = ico(S.mode);
+  $('modeLbl').textContent = t('mode_' + S.mode);
+  const next = MODES[(MODES.indexOf(S.mode) + 1) % 3];
+  $('modeBtn').setAttribute('aria-label', `${t('mode_' + S.mode)}. ${t('modeNext')} ${t('mode_' + next)}`);
+}
+function applyLang() {
+  document.documentElement.lang = lang;
+  $('langBtn').textContent = lang === 'de' ? 'EN' : 'DE';
+  $('langBtn').setAttribute('aria-label', lang === 'de' ? 'English' : 'Deutsch');
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+  document.querySelectorAll('.tab').forEach(b => b.innerHTML = ico(b.dataset.tab) + `<span>${t(b.dataset.tab)}</span>`);
+  [['zIn', 'plus', 'zoomIn'], ['zOut', 'minus', 'zoomOut'], ['locBtn', 'loc', 'locate'], ['closeBtn', 'close', 'close'], ['backBtn', 'back', 'back']]
+    .forEach(([id, i, k]) => { $(id).innerHTML = ico(i); $(id).setAttribute('aria-label', t(k)); });
+  applyMode(); renderWind(); renderStatus(); renderChips(); fixScale();
+  if (S.panel) renderPanel();
+}
+
+/* ---------- Karte ---------- */
+if (!window.maplibregl) { document.getElementById('wrap').innerHTML = `<p class="note" style="padding:20px">${esc(t('mapFail'))}</p>`; throw new Error('maplibre missing'); }
+const view = store.get('view', CFG.start);
+const map = new maplibregl.Map({
+  container: 'map', style: CFG.style, center: view.center, zoom: view.zoom,
+  attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, touchPitch: false, maxPitch: 0
+});
+map.touchZoomRotate.disableRotation();
+map.keyboard.disableRotation();
+map.addControl(new maplibregl.ScaleControl({ unit: 'nautical', maxWidth: 110 }), 'bottom-left');
+map.on('error', e => console.warn('Karte:', e && e.error && e.error.message));
+
+// MapLibre beschriftet Seemeilen mit "nm"; im Deutschen "sm"
+function fixScale() {
+  const el = document.querySelector('.maplibregl-ctrl-scale');
+  if (!el) return;
+  const want = lang === 'de' ? 'sm' : 'nm', other = lang === 'de' ? 'nm' : 'sm';
+  if (el.textContent.includes(other)) el.textContent = el.textContent.replace(other, want);
+}
+new MutationObserver(fixScale).observe($('map'), { subtree: true, childList: true, characterData: true });
+
+function shipImg(fill, stroke, moving, size) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'); g.lineWidth = 2; g.fillStyle = fill; g.strokeStyle = stroke;
+  g.beginPath();
+  if (moving) { g.moveTo(size / 2, 2); g.lineTo(size - 5, size - 3); g.lineTo(size / 2, size * .72); g.lineTo(5, size - 3); g.closePath(); }
+  else g.arc(size / 2, size / 2, size * .28, 0, Math.PI * 2);
+  g.fill(); g.stroke();
+  return g.getImageData(0, 0, size, size);
+}
+const fc = (features = []) => ({ type: 'FeatureCollection', features });
+const pt = (c, props = {}) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: c }, properties: props });
+const ln = (cs, props = {}) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: cs }, properties: props });
+const src = id => map.getSource(id);
+
+let mapReady = false;
+map.on('load', () => {
+  mapReady = true;
+  const add = (id, img) => { if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 2 }); };
+  add('fw-ship', shipImg('#F2B705', '#1C1600', true, 30));
+  add('fw-ship-old', shipImg('#A7B3BB', '#3B4A55', true, 30));
+  add('fw-moor', shipImg('#F2B705', '#1C1600', false, 22));
+  add('fw-moor-old', shipImg('#A7B3BB', '#3B4A55', false, 22));
+  add('fw-own', shipImg('#E8175D', '#FFFFFF', true, 46));
+
+  ['track', 'route', 'measure', 'ais', 'sel', 'ownvec', 'own'].forEach(id => map.addSource(id, { type: 'geojson', data: fc() }));
+  map.addLayer({ id: 'track-l', type: 'line', source: 'track', paint: { 'line-color': '#E8175D', 'line-width': 2, 'line-opacity': .55 } });
+  map.addLayer({ id: 'route-l', type: 'line', source: 'route', filter: ['==', '$type', 'LineString'], paint: { 'line-color': '#E8175D', 'line-width': 3 } });
+  map.addLayer({ id: 'route-p', type: 'circle', source: 'route', filter: ['==', '$type', 'Point'], paint: { 'circle-radius': 6, 'circle-color': '#fff', 'circle-stroke-color': '#E8175D', 'circle-stroke-width': 3 } });
+  map.addLayer({ id: 'measure-l', type: 'line', source: 'measure', filter: ['==', '$type', 'LineString'], paint: { 'line-color': '#0F2536', 'line-width': 2.5, 'line-dasharray': [2, 1.5] } });
+  map.addLayer({ id: 'measure-p', type: 'circle', source: 'measure', filter: ['==', '$type', 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#0F2536', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
+  map.addLayer({ id: 'sel-c', type: 'circle', source: 'sel', paint: { 'circle-radius': 18, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#F2B705', 'circle-stroke-width': 3 } });
+  map.addLayer({ id: 'ais-sym', type: 'symbol', source: 'ais', layout: {
+    'icon-image': ['get', 'img'], 'icon-rotate': ['get', 'rot'], 'icon-rotation-alignment': 'map',
+    'icon-allow-overlap': true, 'icon-ignore-placement': true } });
+  map.addLayer({ id: 'ownvec-l', type: 'line', source: 'ownvec', paint: { 'line-color': '#E8175D', 'line-width': 3 } });
+  map.addLayer({ id: 'own-sym', type: 'symbol', source: 'own', layout: {
+    'icon-image': 'fw-own', 'icon-rotate': ['get', 'rot'], 'icon-rotation-alignment': 'map',
+    'icon-allow-overlap': true, 'icon-ignore-placement': true } });
+
+  renderTrack(); renderRoute(); renderMeasure(); renderAis(); renderOwn();
+  pollAis(); loadWx();
+});
+
+map.on('moveend', () => {
+  const c = map.getCenter();
+  store.set('view', { center: [c.lng, c.lat], zoom: map.getZoom() });
+  renderStatus(); renderChips();
+  debouncedAis(); debouncedWx();
+  if (S.panel === 'schiffe') renderPanel();
+});
+map.on('dragstart', () => { if (S.follow) { S.follow = false; if (S.panel === 'fahrt') renderPanel(); } });
+
+map.on('click', e => {
+  const ll = [e.lngLat.lng, e.lngLat.lat];
+  if (S.tool === 'measure') {
+    if (S.measure.length >= 2) S.measure = [];
+    S.measure.push(ll); renderMeasure(); renderPanel(); return;
+  }
+  if (S.tool === 'route') { S.route.push(ll); saveRoute(); renderRoute(); renderPanel(); return; }
+  if (!map.getLayer('ais-sym')) return;
+  const q = 16, f = map.queryRenderedFeatures([[e.point.x - q, e.point.y - q], [e.point.x + q, e.point.y + q]], { layers: ['ais-sym'] });
+  if (f.length) { S.selected = f[0].properties.mmsi; openPanel('ship'); renderSel(); }
+});
+
+/* ---------- Zeichnen ---------- */
+function renderTrack() { if (src('track')) src('track').setData(S.track.length > 1 ? fc([ln(S.track.map(p => [p[0], p[1]]))]) : fc()); }
+function renderRoute() {
+  if (!src('route')) return;
+  const f = S.route.map((p, i) => pt(p, { i }));
+  if (S.route.length > 1) f.unshift(ln(S.route));
+  src('route').setData(fc(f));
+}
+function renderMeasure() {
+  if (!src('measure')) return;
+  const f = S.measure.map(p => pt(p));
+  if (S.measure.length === 2) f.unshift(ln(S.measure));
+  src('measure').setData(fc(f));
+}
+function renderOwn() {
+  if (!src('own')) return;
+  const o = S.own;
+  if (!o) { src('own').setData(fc()); src('ownvec').setData(fc()); return; }
+  src('own').setData(fc([pt(o.p, { rot: o.cog ?? 0 })]));
+  // Vorausvektor: Position in 6 Minuten bei aktueller Fahrt
+  src('ownvec').setData(o.sog > .5 && o.cog != null ? fc([ln([o.p, destPt(o.p, o.cog, o.sog * .1)])]) : fc());
+}
+function renderSel() {
+  if (!src('sel')) return;
+  const s = S.selected != null && S.ais.get(S.selected);
+  src('sel').setData(s && S.aisOn ? fc([pt([s.lon, s.lat])]) : fc());
+}
+
+/* ---------- AIS ---------- */
+function shipAgeMin(s) { return (Date.now() - s.seen) / 60000; }
+function renderAis() {
+  const now = Date.now();
+  for (const [k, s] of S.ais) if (now - s.seen > CFG.aisDropMin * 60000) S.ais.delete(k);
+  if (!src('ais')) return;
+  if (!S.aisOn) { src('ais').setData(fc()); renderSel(); renderChips(); return; }
+  const f = [];
+  for (const s of S.ais.values()) {
+    if (!isFinite(s.lat) || !isFinite(s.lon)) continue;
+    const old = shipAgeMin(s) > CFG.aisStaleMin, moving = s.sog >= .5 && s.cog != null;
+    f.push(pt([s.lon, s.lat], {
+      mmsi: s.mmsi, img: (moving ? 'fw-ship' : 'fw-moor') + (old ? '-old' : ''),
+      rot: s.hdg != null ? s.hdg : (s.cog ?? 0)
+    }));
+  }
+  src('ais').setData(fc(f)); renderSel(); renderChips();
+}
+function shipsInView() {
+  const b = map.getBounds();
+  return [...S.ais.values()].filter(s => isFinite(s.lat) && b.contains([s.lon, s.lat]));
+}
+async function pollAis() {
+  if (!S.aisOn) return;
+  if (!S.relay) { S.aisStatus = 'norelay'; return afterAis(); }
+  if (map.getZoom() < CFG.aisMinZoom) { S.aisStatus = 'zoom'; return afterAis(); }
+  if (!S.online) return;
+  const b = map.getBounds();
+  const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map(v => v.toFixed(3)).join(',');
+  S.aisStatus = S.aisAt ? S.aisStatus : 'loading'; afterAis(true);
+  try {
+    const j = await fetchJson(`${S.relay}${S.relay.includes('?') ? '&' : '?'}bbox=${bbox}`, 25000);
+    const now = Date.now();
+    for (const r of j.ships || []) {
+      if (!r.mmsi) continue;
+      const prev = S.ais.get(r.mmsi) || { mmsi: r.mmsi, seen: 0 };
+      const clean = Object.fromEntries(Object.entries(r).filter(([, v]) => v != null && v !== ''));
+      const seen = r.t ? (Date.parse(r.t) || now) : prev.seen || now;
+      S.ais.set(r.mmsi, { ...prev, ...clean, seen: Math.max(prev.seen, Math.min(seen, now)) });
+    }
+    S.aisStatus = 'ok'; S.aisAt = now;
+  } catch (e) {
+    S.aisStatus = e.body && e.body.error === 'not_configured' ? 'notcfg' : 'error';
+  }
+  afterAis();
+}
+function afterAis(quiet) {
+  if (!quiet) renderAis();
+  if (S.panel === 'schiffe' || S.panel === 'ship') renderPanel();
+}
+const debouncedAis = debounce(pollAis, 1200);
+setInterval(pollAis, CFG.aisPollMs);
+setInterval(() => { renderAis(); if (S.panel === 'schiffe') renderPanel(); }, 60000);
+
+/* ---------- Wetter & Wasserstand ---------- */
+async function loadWx(force) {
+  if (!mapReady) return;
+  const c = map.getCenter(), p = [c.lng, c.lat];
+  if (!force && S.wxPos && distNm(p, S.wxPos) < 5 && Date.now() - S.wxAt < 10 * 60000) return;
+  S.wxPos = p; S.wxAt = Date.now();
+  const ll = `latitude=${c.lat.toFixed(3)}&longitude=${c.lng.toFixed(3)}&timezone=auto`;
+  const [w, m] = await Promise.allSettled([
+    fetchJson(`${CFG.meteo}?${ll}&forecast_days=2&wind_speed_unit=kn&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m,precipitation_probability`),
+    fetchJson(`${CFG.marine}?${ll}&forecast_days=3&hourly=wave_height,wave_direction,wave_period,sea_level_height_msl`)
+  ]);
+  S.wx = w.status === 'fulfilled' ? w.value : S.wx;
+  S.wxErr = w.status !== 'fulfilled';
+  S.marine = m.status === 'fulfilled' ? m.value : null;
+  S.marineErr = m.status !== 'fulfilled';
+  if (S.wxErr) S.wxAt = 0;
+  renderWind();
+  if (S.panel === 'wetter' || S.panel === 'gezeiten') renderPanel();
+}
+const debouncedWx = debounce(() => loadWx(), 2000);
+setInterval(() => loadWx(), 10 * 60000);
+
+function renderWind() {
+  const el = $('wind');
+  el.hidden = !S.windOn;
+  const c = S.wx && S.wx.current;
+  if (!c) { $('windV').innerHTML = '–'; $('windS').textContent = S.wxErr ? t('wxError') : t('wxLoading'); return; }
+  const kn = c.wind_speed_10m, dir = c.wind_direction_10m;
+  $('windV').innerHTML = `${Math.round(kn)}<small>kn</small>`;
+  $('windS').textContent = `${bft(kn)} Bft ${t('from')} ${compass(dir)}, ${t('gusts')} ${Math.round(c.wind_gusts_10m)}`;
+  // Pfeil zeigt, wohin der Wind weht
+  $('windArr').style.transform = `rotate(${dir}deg)`;
+  $('wind').setAttribute('aria-label', `${t('wind')} ${Math.round(kn)} kn, ${bft(kn)} Beaufort ${t('from')} ${compass(dir)}`);
+}
+
+/* ---------- GPS ---------- */
+function startGps() {
+  if (S.watchId != null) return;
+  if (!('geolocation' in navigator)) { toast(t('gpsNone')); return; }
+  S.watchId = navigator.geolocation.watchPosition(onPos, err => {
+    toast(err.code === 1 ? t('gpsDenied') : t('gpsNone'));
+    if (err.code === 1) stopGps();
+  }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 });
+  if (S.panel === 'fahrt') renderPanel();
+}
+function stopGps() {
+  if (S.watchId != null) navigator.geolocation.clearWatch(S.watchId);
+  S.watchId = null; S.follow = false;
+  if (S.panel === 'fahrt') renderPanel();
+}
+function onPos(pos) {
+  const c = pos.coords, p = [c.longitude, c.latitude], prev = S.own;
+  let sog = c.speed != null && c.speed >= 0 ? c.speed * 1.943844 : null;
+  let cog = c.heading != null && isFinite(c.heading) && sog > .3 ? c.heading : null;
+  if (prev) {
+    const dtH = (pos.timestamp - prev.t) / 3.6e6, d = distNm(prev.p, p);
+    if (dtH > 0 && d > .005) { if (sog == null) sog = d / dtH; if (cog == null) cog = bearing(prev.p, p); }
+    else if (cog == null) cog = prev.cog;
+  }
+  S.own = { p, acc: c.accuracy, sog, cog, t: pos.timestamp };
+  if (S.tracking) {
+    const last = S.track[S.track.length - 1];
+    if (!last || distNm([last[0], last[1]], p) > .01) {
+      S.track.push([+p[0].toFixed(6), +p[1].toFixed(6), pos.timestamp]);
+      store.set('track', S.track); renderTrack();
+    }
+  }
+  if (S.follow) map.easeTo({ center: p, duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600 });
+  renderOwn(); renderStatus();
+  if (S.panel === 'fahrt') renderPanel();
+}
+
+/* ---------- Status & Chips ---------- */
+function renderStatus() {
+  const d = new Date();
+  $('clock').textContent = new Intl.DateTimeFormat(loc(), { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }).format(d);
+  const own = S.own && Date.now() - S.own.t < 120000;
+  const c = map.getCenter();
+  $('posBtn').textContent = fmtPos(own ? S.own.p : [c.lng, c.lat]);
+  $('posBtn').setAttribute('aria-label', `${fmtPos(own ? S.own.p : [c.lng, c.lat])}. ${lang === 'de' ? 'Tippen zum Umschalten des Formats' : 'Tap to switch format'}`);
+  const acc = $('acc');
+  if (!S.online) { acc.textContent = 'offline'; acc.className = 'acc off'; }
+  else { acc.textContent = own ? `±${Math.round(S.own.acc)} m` : t('center'); acc.className = 'acc'; }
+}
+function renderChips() {
+  const a = $('chipAis');
+  a.setAttribute('aria-pressed', S.aisOn);
+  $('aisN').textContent = S.aisOn && S.ais.size && mapReady ? shipsInView().length : '';
+  $('chipWind').setAttribute('aria-pressed', S.windOn);
+}
+setInterval(renderStatus, 15000);
+
+/* ---------- Panels ---------- */
+const TAB_OF = { ship: 'schiffe', ort: 'mehr', gezeiten: 'mehr', info: 'mehr' };
+function openPanel(name) {
+  S.panel = name;
+  S.tool = name === 'messen' ? 'measure' : name === 'route' ? 'route' : null;
+  $('map').classList.toggle('tool', !!S.tool);
+  $('sheet').hidden = false; document.body.classList.add('has-sheet');
+  $('backBtn').hidden = !TAB_OF[name];
+  const tab = TAB_OF[name] || name;
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-current', b.dataset.tab === tab));
+  if (name === 'fahrt') startGps();
+  if (name === 'wetter' || name === 'gezeiten') loadWx();
+  if (name !== 'ship') { S.selected = null; renderSel(); }
+  renderPanel();
+}
+function closePanel() {
+  S.panel = null; S.tool = null; S.selected = null; renderSel();
+  $('map').classList.remove('tool');
+  $('sheet').hidden = true; document.body.classList.remove('has-sheet');
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-current', false));
+}
+function renderPanel() {
+  if (!S.panel) return;
+  $('sheetTitle').textContent = S.panel === 'ship' ? (shipName(S.ais.get(S.selected)) || t('ship')) : t(S.panel);
+  const body = $('sheetBody');
+  const fn = { fahrt: pFahrt, messen: pMessen, route: pRoute, schiffe: pSchiffe, ship: pShip, wetter: pWetter, mehr: pMehr, ort: pOrt, gezeiten: pGezeiten, info: pInfo }[S.panel];
+  body.innerHTML = fn();
+}
+const btn = (act, label, extra = '') => `<button class="btn" type="button" data-act="${act}" ${extra}>${label}</button>`;
+const shipName = s => s ? (s.name && s.name.replace(/@+$/, '').trim()) || `MMSI ${s.mmsi}` : '';
+
+function pFahrt() {
+  const o = S.own, gps = S.watchId != null;
+  const tn = pathNm(S.track.map(p => [p[0], p[1]]));
+  return `
+  <div class="readout">
+    <div><b>${o ? nf(o.sog) : '–'}<small>kn</small></b><span>${t('sog')}</span></div>
+    <div><b>${o ? deg3(o.cog) : '–'}</b><span>${t('cog')}</span></div>
+  </div>
+  ${o ? `<dl class="kv">
+    <dt>${t('position')}</dt><dd>${fmtPos(o.p)}</dd>
+    <dt>${t('accuracy')}</dt><dd>±${Math.round(o.acc)} m</dd>
+    <dt>${t('lastFix')}</dt><dd>${fmtAge(Date.now() - o.t)}</dd>
+    <dt>${t('utc')}</dt><dd>${new Date().toISOString().slice(11, 16)}</dd>
+  </dl>` : `<p class="note">${t('noFix')}</p>`}
+  <div class="row">
+    ${btn('gps', gps ? t('gpsStop') : t('gpsStart'))}
+    ${btn('follow', t('follow'), `aria-pressed="${S.follow}" ${gps ? '' : 'disabled'}`)}
+  </div>
+  <div class="row">
+    ${btn('track', S.tracking ? t('trackStop') : t('trackRec'), `aria-pressed="${S.tracking}"`)}
+    ${btn('trackGpx', t('gpx'), S.track.length > 1 ? '' : 'disabled')}
+    ${btn('trackClear', t('clear'), S.track.length ? '' : 'disabled')}
+  </div>
+  <p class="note">${t('track')}: ${nf(tn, 2)} sm, ${S.track.length} ${t('points')}</p>`;
+}
+
+function pMessen() {
+  const m = S.measure;
+  let res = `<p class="note">${m.length === 1 ? t('measureNext') : t('measureHint')}</p>`;
+  if (m.length === 2) {
+    const b = bearing(m[0], m[1]);
+    res = `<div class="readout">
+      <div><b>${nf(distNm(m[0], m[1]), 2)}<small>sm</small></b><span>${t('distance')}</span></div>
+      <div><b>${deg3(b)}</b><span>${t('course')}</span></div>
+    </div>
+    <dl class="kv"><dt>${t('reverse')}</dt><dd>${deg3(bearing(m[1], m[0]))}</dd></dl>`;
+  }
+  return `${res}<div class="row">
+    ${btn('measureOwn', t('measureFromOwn'), S.own ? '' : 'disabled')}
+    ${btn('measureReset', t('newMeasure'), m.length ? '' : 'disabled')}
+  </div>`;
+}
+
+function pRoute() {
+  const r = S.route;
+  if (!r.length) return `<p class="note">${t('routeHint')}</p>`;
+  const total = pathNm(r), h = total / (S.routeSpeed || NaN);
+  const eta = isFinite(h) ? new Date(Date.now() + h * 3.6e6) : null;
+  const legs = r.slice(1).map((p, i) => `<tr><td>${t('wp')}${i + 1} › ${t('wp')}${i + 2}</td><td>${nf(distNm(r[i], p), 2)} sm</td><td>${deg3(bearing(r[i], p))}</td></tr>`).join('');
+  return `
+  ${r.length > 1 ? `<table class="t"><thead><tr><th></th><th>${t('distance')}</th><th>${t('course')}</th></tr></thead><tbody>${legs}</tbody></table>` : `<p class="note">${t('routeHint')}</p>`}
+  <label class="f" for="spd">${t('speed')}</label>
+  <input id="spd" type="number" inputmode="decimal" min="0.5" max="60" step="0.5" value="${S.routeSpeed}" data-input="speed">
+  <dl class="kv">
+    <dt>${t('total')}</dt><dd>${nf(total, 2)} sm</dd>
+    <dt>${t('duration')}</dt><dd>${fmtDur(h)}</dd>
+    <dt>${t('eta')}</dt><dd>${eta ? eta.toLocaleString(loc(), { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '–'}</dd>
+  </dl>
+  <div class="row">
+    ${btn('routeUndo', t('undo'))}
+    ${btn('routeRev', t('reverseRoute'), r.length > 1 ? '' : 'disabled')}
+    ${btn('routeGpx', t('gpx'), r.length > 1 ? '' : 'disabled')}
+    ${btn('routeClear', t('clear'))}
+  </div>`;
+}
+
+function aisStatusText() {
+  return { norelay: t('aisNoRelay'), zoom: t('aisZoom'), loading: t('aisLoading'), error: t('aisError'), notcfg: t('aisNotCfg'),
+    ok: `${t('aisOk')} ${S.aisAt ? fmtAge(Date.now() - S.aisAt) : ''}`, idle: '' }[S.aisStatus] || '';
+}
+function pSchiffe() {
+  const ref = S.own ? S.own.p : [map.getCenter().lng, map.getCenter().lat];
+  const list = S.aisOn ? shipsInView().map(s => ({ s, d: distNm(ref, [s.lon, s.lat]) })).sort((a, b) => a.d - b.d).slice(0, 40) : [];
+  const items = list.map(({ s, d }) => {
+    const old = shipAgeMin(s) > CFG.aisStaleMin;
+    return `<li class="${old ? 'old' : ''}"><button type="button" data-act="ship" data-mmsi="${s.mmsi}">
+      <span class="nm">${esc(shipName(s))}</span>
+      <span class="mt">${nf(s.sog)} kn</span>
+      <span class="mt">${nf(d, 1)} sm ${deg3(bearing(ref, [s.lon, s.lat]))}</span></button></li>`;
+  }).join('');
+  const st = aisStatusText();
+  return `<div class="row">${btn('aisToggle', t('aisOn'), `aria-pressed="${S.aisOn}"`)}</div>
+    ${S.aisOn && st ? `<p class="note ${S.aisStatus === 'error' || S.aisStatus === 'notcfg' ? 'err' : ''}">${esc(st)}</p>` : ''}
+    ${S.aisOn ? (items ? `<p class="note">${list.length} ${t('inView')}, ${t('older')} ${CFG.aisStaleMin} ${t('minutes')} ${t('greyed')}</p><ul class="list">${items}</ul>`
+      : (S.aisStatus === 'ok' ? `<p class="note">${t('aisNone')}</p>` : '')) : ''}`;
+}
+function pShip() {
+  const s = S.ais.get(S.selected);
+  if (!s) return `<p class="note">${t('aisNone')}</p>`;
+  const ref = S.own ? S.own.p : null;
+  const rows = [
+    [t('sog'), s.sog != null ? `${nf(s.sog)} kn` : null],
+    [t('cog'), s.cog != null ? deg3(s.cog) : null],
+    [t('hdg'), s.hdg != null ? deg3(s.hdg) : null],
+    [t('status'), s.nav != null ? NAVSTAT[lang][s.nav] : null],
+    [t('type'), shipType(s.type)],
+    [t('dest'), s.dest ? esc(s.dest) : null],
+    [t('len'), s.len ? `${s.len} m` : null],
+    [t('position'), fmtPos([s.lon, s.lat])],
+    [t('distFrom'), ref ? `${nf(distNm(ref, [s.lon, s.lat]), 2)} sm ${deg3(bearing(ref, [s.lon, s.lat]))}` : null],
+    [t('seen'), fmtAge(Date.now() - s.seen)],
+    [t('mmsi'), s.mmsi]
+  ].filter(r => r[1] != null);
+  return `<dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`;
+}
+
+function pWetter() {
+  if (!S.wx) return `<p class="note ${S.wxErr ? 'err' : ''}">${S.wxErr ? t('wxError') : t('wxLoading')}</p>`;
+  const c = S.wx.current, h = S.wx.hourly;
+  const mi = {};
+  if (S.marine && S.marine.hourly) S.marine.hourly.time.forEach((tm, i) => mi[tm] = i);
+  const mh = S.marine && S.marine.hourly;
+  const i0 = Math.max(0, h.time.findIndex(x => x >= c.time.slice(0, 13) + ':00'));
+  const wNow = mh && mi[h.time[i0]] != null ? mh.wave_height[mi[h.time[i0]]] : null;
+  const rows = [];
+  for (let i = i0; i < Math.min(h.time.length, i0 + 25); i += 2) {
+    const j = mi[h.time[i]], wv = mh && j != null ? mh.wave_height[j] : null;
+    rows.push(`<tr><td>${h.time[i].slice(11, 16)}</td>
+      <td>${Math.round(h.wind_speed_10m[i])} <span class="note">(${Math.round(h.wind_gusts_10m[i])})</span></td>
+      <td>${compass(h.wind_direction_10m[i])} <svg class="arr" viewBox="0 0 24 24" style="transform:rotate(${h.wind_direction_10m[i]}deg)"><path d="M12 3v18M6 15l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5"/></svg></td>
+      <td>${wv != null ? nf(wv) + ' m' : '–'}</td>
+      <td>${h.precipitation_probability[i] ?? '–'} %</td></tr>`);
+  }
+  return `<div class="readout">
+      <div><b>${Math.round(c.wind_speed_10m)}<small>kn</small></b><span>${bft(c.wind_speed_10m)} Bft ${t('from')} ${compass(c.wind_direction_10m)}</span></div>
+      <div><b>${wNow != null ? nf(wNow) : '–'}<small>m</small></b><span>${t('waves')}</span></div>
+    </div>
+    <dl class="kv"><dt>${t('gusts')}</dt><dd>${Math.round(c.wind_gusts_10m)} kn</dd></dl>
+    <table class="t"><thead><tr><th>${t('time')}</th><th>kn</th><th>${t('from')}</th><th>${t('waves')}</th><th>${t('rain')}</th></tr></thead><tbody>${rows.join('')}</tbody></table>
+    <p class="note">${t('wxAt')} ${c.time.slice(11, 16)} ${esc(S.wx.timezone_abbreviation || '')}, ${t('wxFor')}.</p>
+    <div class="row">${btn('wxRefresh', t('refresh'))}</div>`;
+}
+
+function pMehr() {
+  return `<div class="menu">${['ort', 'gezeiten', 'info'].map(k => `<button class="btn" type="button" data-act="open" data-to="${k}">${ico(k)}${t(k)}</button>`).join('')}</div>`;
+}
+function pOrt() {
+  const res = S.searchState === 'loading' ? `<p class="note">${t('searching')}</p>`
+    : S.searchState === 'none' ? `<p class="note">${t('noResults')}</p>`
+    : S.searchState === 'error' ? `<p class="note err">${t('searchErr')}</p>`
+    : `<ul class="list">${S.searchRes.map((r, i) => `<li><button type="button" data-act="goto" data-i="${i}"><span class="nm">${esc(r.name)}</span></button></li>`).join('')}</ul>`;
+  return `<form class="inline" data-form="search">
+      <input type="text" name="q" value="${esc(S.searchQ)}" placeholder="${t('searchPh')}" aria-label="${t('search')}" autocomplete="off" enterkeyhint="search">
+      <button class="btn" type="submit">${t('search')}</button>
+    </form>${res}`;
+}
+function pGezeiten() {
+  const mh = S.marine && S.marine.hourly;
+  if (!mh) return `<p class="note">${S.marineErr ? t('tideNone') : t('tideLoading')}</p>`;
+  const v = mh.sea_level_height_msl || [], tm = mh.time;
+  if (!v.some(x => x != null)) return `<p class="note">${t('tideNone')}</p>`;
+  const nowStr = new Date(Date.now() + (S.marine.utc_offset_seconds || 0) * 1000).toISOString().slice(0, 13) + ':00';
+  const i0 = Math.max(0, tm.findIndex(x => x >= nowStr));
+  const a = Math.max(0, i0 - 6), b = Math.min(tm.length, i0 + 48);
+  const xs = tm.slice(a, b), ys = v.slice(a, b).map(y => y ?? NaN);
+  const valid = ys.filter(isFinite), lo = Math.min(...valid), hi = Math.max(...valid), span = (hi - lo) || .1;
+  const W = 340, H = 130, pad = 10;
+  const X = i => pad + i * (W - 2 * pad) / (xs.length - 1), Y = y => H - pad - (y - lo) / span * (H - 2 * pad);
+  const d = ys.map((y, i) => isFinite(y) ? `${i && isFinite(ys[i - 1]) ? 'L' : 'M'}${X(i).toFixed(1)},${Y(y).toFixed(1)}` : '').join('');
+  const nx = X(i0 - a);
+  const ext = [];
+  for (let i = Math.max(1, i0 - a); i < ys.length - 1; i++) {
+    if (ys[i] > ys[i - 1] && ys[i] >= ys[i + 1]) ext.push([i, 'high']);
+    else if (ys[i] < ys[i - 1] && ys[i] <= ys[i + 1]) ext.push([i, 'low']);
+  }
+  const day = s => { const [y, m, dd] = s.slice(0, 10).split('-').map(Number); return new Date(Date.UTC(y, m - 1, dd)).toLocaleDateString(loc(), { weekday: 'short', timeZone: 'UTC' }); };
+  const rows = ext.slice(0, 8).map(([i, k]) => `<tr><td>${day(xs[i])} ${xs[i].slice(11, 16)}</td><td>${t(k)}</td><td>${ys[i] >= 0 ? '+' : ''}${Math.round(ys[i] * 100)} cm</td></tr>`).join('');
+  return `<div class="tide"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${t('gezeiten')}">
+      <line x1="${pad}" x2="${W - pad}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}" stroke="var(--line)" stroke-dasharray="3 3"/>
+      <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+      <line x1="${nx}" x2="${nx}" y1="${pad}" y2="${H - pad}" stroke="var(--text)" stroke-width="1.5"/>
+    </svg></div>
+    <table class="t"><thead><tr><th>${t('time')}</th><th></th><th>MSL</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="note">${t('tideNote')}</p>`;
+}
+function pInfo() {
+  return `<label class="f" for="relay">${t('relay')}</label>
+    <form class="inline" data-form="relay">
+      <input id="relay" type="url" name="relay" value="${esc(S.relay)}" placeholder="https://…" autocomplete="off" inputmode="url">
+      <button class="btn" type="submit">${t('save')}</button>
+    </form>
+    <p class="note">${t('relayHelp')}</p>
+    <h3 style="font:600 17px var(--fc);margin:20px 0 6px">${t('sources')}</h3>
+    <p class="note">${[t('srcChart'), t('srcDepth'), t('srcWx'), t('srcGeo'), t('srcAis')].map(esc).join('<br>')}</p>
+    <div class="row">${btn('clearCache', t('clearCache'))}</div>
+    <p class="note">Fahrwasser ${CFG.version}</p>`;
+}
+
+/* ---------- Aktionen ---------- */
+function download(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+function gpx(kind, pts) {
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  const head = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Fahrwasser" xmlns="http://www.topografix.com/GPX/1/1">\n';
+  const body = kind === 'rte'
+    ? `<rte><name>Fahrwasser ${stamp}</name>\n${pts.map((p, i) => `<rtept lat="${p[1].toFixed(6)}" lon="${p[0].toFixed(6)}"><name>WP${i + 1}</name></rtept>`).join('\n')}\n</rte>`
+    : `<trk><name>Fahrwasser ${stamp}</name><trkseg>\n${pts.map(p => `<trkpt lat="${p[1].toFixed(6)}" lon="${p[0].toFixed(6)}">${p[2] ? `<time>${new Date(p[2]).toISOString()}</time>` : ''}</trkpt>`).join('\n')}\n</trkseg></trk>`;
+  download(`fahrwasser-${kind === 'rte' ? 'route' : 'track'}-${stamp}.gpx`, head + body + '\n</gpx>\n', 'application/gpx+xml');
+}
+const saveRoute = () => store.set('route', S.route);
+
+const ACTIONS = {
+  gps: () => S.watchId != null ? stopGps() : startGps(),
+  follow: () => { S.follow = !S.follow; if (S.follow && S.own) map.easeTo({ center: S.own.p }); renderPanel(); },
+  track: () => { S.tracking = !S.tracking; if (S.tracking) startGps(); renderPanel(); },
+  trackGpx: () => gpx('trk', S.track),
+  trackClear: () => { S.track = []; store.set('track', []); renderTrack(); renderPanel(); },
+  measureOwn: () => { if (S.own) { S.measure = [S.own.p]; renderMeasure(); renderPanel(); } },
+  measureReset: () => { S.measure = []; renderMeasure(); renderPanel(); },
+  routeUndo: () => { S.route.pop(); saveRoute(); renderRoute(); renderPanel(); },
+  routeRev: () => { S.route.reverse(); saveRoute(); renderRoute(); renderPanel(); },
+  routeGpx: () => gpx('rte', S.route),
+  routeClear: () => { S.route = []; saveRoute(); renderRoute(); renderPanel(); },
+  aisToggle: () => toggleAis(),
+  ship: el => { S.selected = Number(el.dataset.mmsi); const s = S.ais.get(S.selected); if (s) map.easeTo({ center: [s.lon, s.lat] }); openPanel('ship'); renderSel(); },
+  wxRefresh: () => { S.wx = null; renderPanel(); loadWx(true); },
+  open: el => openPanel(el.dataset.to),
+  goto: el => { const r = S.searchRes[+el.dataset.i]; if (r) map.flyTo({ center: [r.lon, r.lat], zoom: Math.max(map.getZoom(), 12) }); },
+  clearCache: async () => {
+    try { const keys = await caches.keys(); await Promise.all(keys.filter(k => k.startsWith('fw-tiles')).map(k => caches.delete(k))); } catch {}
+    toast(t('cacheCleared'));
+  }
+};
+$('sheetBody').addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (el && !el.disabled && ACTIONS[el.dataset.act]) ACTIONS[el.dataset.act](el);
+});
+$('sheetBody').addEventListener('change', e => {
+  if (e.target.dataset.input === 'speed') {
+    const v = parseFloat(String(e.target.value).replace(',', '.'));
+    if (v > 0) { S.routeSpeed = v; store.set('routeSpeed', v); renderPanel(); }
+  }
+});
+$('sheetBody').addEventListener('submit', async e => {
+  e.preventDefault();
+  const f = e.target, kind = f.dataset.form;
+  if (kind === 'relay') {
+    S.relay = f.relay.value.trim().replace(/\/+$/, '');
+    store.set('relay', S.relay); S.aisAt = null; toast(t('saved')); pollAis();
+  }
+  if (kind === 'search') {
+    const q = S.searchQ = f.q.value.trim();
+    if (!q) return;
+    const m = q.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*$/);
+    if (m && Math.abs(+m[1]) <= 90 && Math.abs(+m[2]) <= 180) { map.flyTo({ center: [+m[2], +m[1]], zoom: Math.max(map.getZoom(), 12) }); return; }
+    S.searchState = 'loading'; renderPanel();
+    try {
+      const j = await fetchJson(`${CFG.geocode}?format=jsonv2&limit=8&accept-language=${lang}&q=${encodeURIComponent(q)}`);
+      S.searchRes = j.map(r => ({ name: r.display_name, lat: +r.lat, lon: +r.lon }));
+      S.searchState = j.length ? 'ok' : 'none';
+    } catch { S.searchState = 'error'; }
+    renderPanel();
+  }
+});
+function toggleAis() {
+  S.aisOn = !S.aisOn; store.set('aisOn', S.aisOn);
+  renderAis(); if (S.aisOn) pollAis();
+  if (S.panel === 'schiffe') renderPanel();
+}
+
+/* ---------- Kopfzeile, Tabs, Steuerung ---------- */
+$('modeBtn').onclick = () => { S.mode = MODES[(MODES.indexOf(S.mode) + 1) % 3]; store.set('mode', S.mode); applyMode(); };
+$('langBtn').onclick = () => { lang = lang === 'de' ? 'en' : 'de'; store.set('lang', lang); applyLang(); };
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  const name = b.dataset.tab;
+  (S.panel === name || TAB_OF[S.panel] === name) ? closePanel() : openPanel(name);
+});
+$('closeBtn').onclick = closePanel;
+$('backBtn').onclick = () => openPanel(TAB_OF[S.panel]);
+$('zIn').onclick = () => map.zoomIn();
+$('zOut').onclick = () => map.zoomOut();
+$('locBtn').onclick = () => {
+  startGps(); S.follow = true;
+  if (S.own) map.easeTo({ center: S.own.p, zoom: Math.max(map.getZoom(), 12) });
+  if (S.panel === 'fahrt') renderPanel();
+};
+$('chipAis').onclick = toggleAis;
+$('chipWind').onclick = () => { S.windOn = !S.windOn; store.set('windOn', S.windOn); renderWind(); renderChips(); };
+$('posBtn').onclick = () => { S.coordFmt = S.coordFmt === 'dm' ? 'dec' : 'dm'; store.set('coordFmt', S.coordFmt); renderStatus(); if (S.panel) renderPanel(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.panel) closePanel(); });
+addEventListener('online', () => { S.online = true; renderStatus(); toast(t('online')); pollAis(); loadWx(true); });
+addEventListener('offline', () => { S.online = false; renderStatus(); toast(t('offline'), 6000); });
+
+/* ---------- Start ---------- */
+applyLang();
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service Worker:', err));
+}
+</script>
+</body>
+</html>
