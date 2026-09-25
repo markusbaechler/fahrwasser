@@ -204,7 +204,7 @@ const CFG = {
   tides: 'https://api.openwaters.io/tides',
   radar: 'https://api.rainviewer.com/public/weather-maps.json',
   aisPollMs: 20000, aisStaleMin: 10, aisDropMin: 30, aisMinZoom: 8,
-  version: '1.6.0'
+  version: '1.6.1'
 };
 
 /* ---------- Speicher (fehlertolerant) ---------- */
@@ -903,7 +903,7 @@ function renderRadar() {
   if (!S.radar) { $('radarInfo').textContent = S.radarErr ? t('radarErr') : t('radarNote') + ' …'; return; }
   const R = S.radar, before = map.getStyle().layers.find(l => l.type === 'symbol');
   R.frames.forEach((f, k) => {
-    map.addSource(`radar-${k}`, { type: 'raster', tiles: [`${R.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`], tileSize: 256, maxzoom: 12, attribution: 'RainViewer' });
+    map.addSource(`radar-${k}`, { type: 'raster', tiles: [`${R.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`], tileSize: 256, maxzoom: 7, attribution: 'RainViewer' }); // RainViewer liefert native Kacheln nur bis Zoom 7, darüber wird hochskaliert
     map.addLayer({ id: `radar-${k}`, type: 'raster', source: `radar-${k}`, paint: { 'raster-opacity': 0, 'raster-fade-duration': 0, 'raster-opacity-transition': { duration: 0 } } }, before ? before.id : 'track-l');
   });
   radarShow(R.i);
