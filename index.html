@@ -183,7 +183,7 @@ const CFG = {
   marine: 'https://marine-api.open-meteo.com/v1/marine',
   geocode: 'https://nominatim.openstreetmap.org/search',
   aisPollMs: 20000, aisStaleMin: 10, aisDropMin: 30, aisMinZoom: 8,
-  version: '1.2.0'
+  version: '1.2.1'
 };
 
 /* ---------- Speicher (fehlertolerant) ---------- */
@@ -735,8 +735,10 @@ async function pollAis() {
   if (!S.relay) { S.aisStatus = 'norelay'; return afterAis(); }
   if (map.getZoom() < CFG.aisMinZoom) { S.aisStatus = 'zoom'; return afterAis(); }
   if (!S.online) return;
-  const b = map.getBounds();
-  const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].map(v => v.toFixed(3)).join(',');
+  // Ausschnitt plus Rand (mind. ±0.15°), gleiche Logik wie der Relay-Test
+  const b = map.getBounds(), c = map.getCenter();
+  const dx = Math.max(.15, (b.getEast() - b.getWest()) / 2 * 1.3), dy = Math.max(.15, (b.getNorth() - b.getSouth()) / 2 * 1.3);
+  const bbox = [c.lng - dx, c.lat - dy, c.lng + dx, c.lat + dy].map(v => v.toFixed(2)).join(',');
   S.aisStatus = S.aisAt ? S.aisStatus : 'loading'; afterAis(true);
   try {
     const j = await fetchJson(`${S.relay}${S.relay.includes('?') ? '&' : '?'}bbox=${bbox}`, 25000);
