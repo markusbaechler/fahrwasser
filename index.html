@@ -181,7 +181,7 @@ const CFG = {
   marine: 'https://marine-api.open-meteo.com/v1/marine',
   geocode: 'https://nominatim.openstreetmap.org/search',
   aisPollMs: 20000, aisStaleMin: 10, aisDropMin: 30, aisMinZoom: 8,
-  version: '1.0.0'
+  version: '1.1.0'
 };
 
 /* ---------- Speicher (fehlertolerant) ---------- */
@@ -227,7 +227,16 @@ const I18N = {
     srcWx:'Wetter, Wellen, Wasserstand: Open-Meteo (CC BY 4.0)',
     srcGeo:'Ortssuche: Nominatim, © OpenStreetMap-Mitwirkende',
     srcAis:'AIS: aisstream.io über dein eigenes Relay',
-    relayHelp:'Die Adresse deines Cloudflare Workers, z.B. https://fahrwasser-ais.deinname.workers.dev'
+    relayHelp:'Die Adresse deines Cloudflare Workers, z.B. https://fahrwasser-ais.deinname.workers.dev',
+    navStart:'Navigation starten', navStop:'Navigation beenden', navNext:'Nächster WP', navPrev:'Vorheriger WP',
+    brg:'Peilung', dst:'Distanz', xte:'Kursabweichung', etaWp:'Ankunft WP', etaEnd:'Ankunft Ziel', navTo:'Kurs auf',
+    steerL:'nach Backbord', steerR:'nach Steuerbord', navArrived:'Ziel erreicht.', navNoGps:'Warte auf GPS-Position …',
+    atSpeed:'bei', planned:'geplant', routeWx:'Wind entlang der Route', routeWxLoading:'Lade Wind entlang der Route …',
+    routeWxErr:'Wind entlang der Route nicht verfügbar.', rel:'Anströmung',
+    rel0:'Gegenan', rel1:'Am Wind', rel2:'Halbwind', rel3:'Raumschots', rel4:'Vor dem Wind', portS:'Bb', stbdS:'Stb',
+    objekt:'Objekt', objMore:'Weitere Objekte an dieser Stelle', light:'Feuer', characteristic:'Kennung',
+    range:'Tragweite', height:'Höhe', colour:'Farbe', shape:'Form', topmark:'Toppzeichen', sector:'Sektor',
+    relayTest:'Relay testen', relayOk:'Relay antwortet', relayFail:'Relay-Fehler', ships:'Schiffe', testing:'Teste …'
   },
   en: {
     fahrt:'Voyage', messen:'Measure', route:'Route', schiffe:'Ships', wetter:'Weather', mehr:'More',
@@ -264,7 +273,16 @@ const I18N = {
     srcWx:'Weather, waves, water level: Open-Meteo (CC BY 4.0)',
     srcGeo:'Place search: Nominatim, © OpenStreetMap contributors',
     srcAis:'AIS: aisstream.io via your own relay',
-    relayHelp:'Your Cloudflare Worker address, e.g. https://fahrwasser-ais.yourname.workers.dev'
+    relayHelp:'Your Cloudflare Worker address, e.g. https://fahrwasser-ais.yourname.workers.dev',
+    navStart:'Start navigation', navStop:'Stop navigation', navNext:'Next WP', navPrev:'Previous WP',
+    brg:'Bearing', dst:'Distance', xte:'Cross-track error', etaWp:'ETA waypoint', etaEnd:'ETA destination', navTo:'Heading for',
+    steerL:'steer port', steerR:'steer starboard', navArrived:'Destination reached.', navNoGps:'Waiting for GPS fix …',
+    atSpeed:'at', planned:'planned', routeWx:'Wind along the route', routeWxLoading:'Loading wind along the route …',
+    routeWxErr:'Wind along the route unavailable.', rel:'Point of sail',
+    rel0:'Head wind', rel1:'Close-hauled', rel2:'Beam reach', rel3:'Broad reach', rel4:'Running', portS:'port', stbdS:'stbd',
+    objekt:'Object', objMore:'More objects here', light:'Light', characteristic:'Characteristic',
+    range:'Range', height:'Height', colour:'Colour', shape:'Shape', topmark:'Topmark', sector:'Sector',
+    relayTest:'Test relay', relayOk:'Relay responds', relayFail:'Relay error', ships:'ships', testing:'Testing …'
   }
 };
 const COMPASS = {
@@ -275,6 +293,41 @@ const NAVSTAT = {
   de: {0:'In Fahrt (Motor)',1:'Vor Anker',2:'Manövrierunfähig',3:'Manövrierbehindert',5:'Festgemacht',7:'Fischend',8:'Unter Segeln'},
   en: {0:'Under way (engine)',1:'At anchor',2:'Not under command',3:'Restricted manoeuvrability',5:'Moored',7:'Fishing',8:'Under sail'}
 };
+const SEAMARK = {
+  de: { buoy_lateral:'Lateraltonne', buoy_cardinal:'Kardinaltonne', buoy_safe_water:'Ansteuerungstonne', buoy_special_purpose:'Sondertonne',
+    buoy_isolated_danger:'Einzelgefahrtonne', buoy_installation:'Installationstonne', beacon_lateral:'Lateralbake', beacon_cardinal:'Kardinalbake',
+    beacon_safe_water:'Ansteuerungsbake', beacon_special_purpose:'Sonderbake', beacon_isolated_danger:'Einzelgefahrbake',
+    light_major:'Leuchtfeuer', light_minor:'Kleines Feuer', light_vessel:'Feuerschiff', light_float:'Leuchtfloss', light:'Feuer',
+    landmark:'Landmarke', harbour:'Hafen', mooring:'Anlegestelle', anchorage:'Ankerplatz', anchor_berth:'Ankerliegeplatz', berth:'Liegeplatz',
+    rock:'Felsen', wreck:'Wrack', obstruction:'Hindernis', cable_submarine:'Unterseekabel', pipeline_submarine:'Pipeline',
+    restricted_area:'Sperr- oder Schutzgebiet', military_area:'Militärgebiet', small_craft_facility:'Einrichtung für Sportboote',
+    fog_signal:'Nebelsignal', daymark:'Tagesmarke', platform:'Plattform', pile:'Pfahl', marine_farm:'Aquakultur', notice:'Schifffahrtszeichen',
+    radar_reflector:'Radarreflektor', radio_station:'Funkstation', coastguard_station:'Küstenwache', rescue_station:'Rettungsstation',
+    pilot_boarding:'Lotsenstation', separation_zone:'Trennzone', separation_lane:'Verkehrstrennungsgebiet', gate:'Schleuse oder Tor',
+    bridge:'Brücke', shoreline_construction:'Uferbauwerk', seabed_area:'Grundart', water_turbulence:'Strömung', sea_area:'Seegebiet',
+    distance_mark:'Distanzmarke', spring:'Quelle', hulk:'Hulk', production_area:'Förderfeld', dumping_ground:'Verklappungsgebiet' },
+  en: { buoy_lateral:'Lateral buoy', buoy_cardinal:'Cardinal buoy', buoy_safe_water:'Safe water buoy', buoy_special_purpose:'Special purpose buoy',
+    buoy_isolated_danger:'Isolated danger buoy', buoy_installation:'Installation buoy', beacon_lateral:'Lateral beacon', beacon_cardinal:'Cardinal beacon',
+    beacon_safe_water:'Safe water beacon', beacon_special_purpose:'Special purpose beacon', beacon_isolated_danger:'Isolated danger beacon',
+    light_major:'Major light', light_minor:'Minor light', light_vessel:'Light vessel', light_float:'Light float', light:'Light',
+    landmark:'Landmark', harbour:'Harbour', mooring:'Mooring', anchorage:'Anchorage', anchor_berth:'Anchor berth', berth:'Berth',
+    rock:'Rock', wreck:'Wreck', obstruction:'Obstruction', cable_submarine:'Submarine cable', pipeline_submarine:'Pipeline',
+    restricted_area:'Restricted area', military_area:'Military area', small_craft_facility:'Small craft facility',
+    fog_signal:'Fog signal', daymark:'Daymark', platform:'Platform', pile:'Pile', marine_farm:'Marine farm', notice:'Notice mark',
+    radar_reflector:'Radar reflector', radio_station:'Radio station', coastguard_station:'Coastguard station', rescue_station:'Rescue station',
+    pilot_boarding:'Pilot boarding', separation_zone:'Separation zone', separation_lane:'Traffic lane', gate:'Gate or lock',
+    bridge:'Bridge', shoreline_construction:'Shoreline construction', seabed_area:'Seabed', water_turbulence:'Turbulence', sea_area:'Sea area',
+    distance_mark:'Distance mark', spring:'Spring', hulk:'Hulk', production_area:'Production area', dumping_ground:'Dumping ground' }
+};
+const VAL = {
+  de: { port:'Backbord', starboard:'Steuerbord', north:'Nord', south:'Süd', east:'Ost', west:'West', red:'rot', green:'grün', white:'weiss',
+    yellow:'gelb', black:'schwarz', blue:'blau', orange:'orange', conical:'kegelförmig', can:'zylindrisch', spherical:'kugelförmig', pillar:'Bakentonne',
+    spar:'Spierentonne', barrel:'Fasstonne', cylinder:'Zylinder', cone_point_up:'Kegel Spitze oben', cone_point_down:'Kegel Spitze unten',
+    sphere:'Kugel', x_shape:'Kreuz', marina:'Marina', fishing:'Fischereihafen', yes:'ja', no:'nein', horizontal:'horizontal', vertical:'vertikal',
+    preferred_channel_port:'Vorzugsfahrwasser Backbord', preferred_channel_starboard:'Vorzugsfahrwasser Steuerbord', nature_reserve:'Naturschutzgebiet' },
+  en: {}
+};
+const vt = v => VAL[lang][v] ?? String(v).replace(/_/g, ' ');
 function shipType(c) {
   if (c == null) return null;
   const de = lang === 'de';
@@ -323,6 +376,7 @@ const S = {
   measure: [], route: store.get('route', []), routeSpeed: store.get('routeSpeed', 5),
   ais: new Map(), aisOn: store.get('aisOn', true), aisStatus: 'idle', aisAt: null, relay: store.get('relay', ''),
   windOn: store.get('windOn', true), wx: null, marine: null, wxAt: 0, wxPos: null, wxErr: false, marineErr: false,
+  nav: { on: false, wp: 0 }, routeWx: null, routeWxState: 'idle', objs: [], objIdx: 0, relayTest: '',
   selected: null, searchQ: '', searchRes: [], searchState: 'idle', online: navigator.onLine
 };
 const $ = id => document.getElementById(id);
@@ -347,6 +401,15 @@ function destPt(p, brg, nm) {
   const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(th));
   const l2 = l1 + Math.atan2(Math.sin(th) * Math.sin(d) * Math.cos(p1), Math.cos(d) - Math.sin(p1) * Math.sin(p2));
   return [dg(l2), dg(p2)];
+}
+// Kursabweichung in sm, positiv = rechts der Linie a→b
+function xteNm(a, b, p) {
+  const d13 = distNm(a, p) / R_NM, t13 = rad(bearing(a, p)), t12 = rad(bearing(a, b));
+  return Math.asin(Math.sin(d13) * Math.sin(t13 - t12)) * R_NM;
+}
+function alongNm(a, b, p) {
+  const d13 = distNm(a, p) / R_NM, dxt = xteNm(a, b, p) / R_NM;
+  return Math.acos(Math.min(1, Math.cos(d13) / Math.cos(dxt))) * R_NM;
 }
 const pathNm = pts => pts.reduce((s, p, i) => i ? s + distNm(pts[i - 1], p) : 0, 0);
 const BFT = [1, 4, 7, 11, 17, 22, 28, 34, 41, 48, 56, 64];
@@ -457,10 +520,15 @@ map.on('load', () => {
   add('fw-moor-old', shipImg('#A7B3BB', '#3B4A55', false, 22));
   add('fw-own', shipImg('#E8175D', '#FFFFFF', true, 46));
 
-  ['track', 'route', 'measure', 'ais', 'sel', 'ownvec', 'own'].forEach(id => map.addSource(id, { type: 'geojson', data: fc() }));
+  ['track', 'route', 'measure', 'ais', 'sel', 'ownvec', 'own', 'navline', 'navwp'].forEach(id => map.addSource(id, { type: 'geojson', data: fc() }));
   map.addLayer({ id: 'track-l', type: 'line', source: 'track', paint: { 'line-color': '#E8175D', 'line-width': 2, 'line-opacity': .55 } });
   map.addLayer({ id: 'route-l', type: 'line', source: 'route', filter: ['==', '$type', 'LineString'], paint: { 'line-color': '#E8175D', 'line-width': 3 } });
   map.addLayer({ id: 'route-p', type: 'circle', source: 'route', filter: ['==', '$type', 'Point'], paint: { 'circle-radius': 6, 'circle-color': '#fff', 'circle-stroke-color': '#E8175D', 'circle-stroke-width': 3 } });
+  map.addLayer({ id: 'route-t', type: 'symbol', source: 'route', filter: ['==', '$type', 'Point'], layout: {
+    'text-field': ['to-string', ['+', ['get', 'i'], 1]], 'text-font': ['Noto Sans Regular'], 'text-size': 12,
+    'text-offset': [0, -1.3], 'text-allow-overlap': true }, paint: { 'text-color': '#E8175D', 'text-halo-color': '#fff', 'text-halo-width': 1.5 } });
+  map.addLayer({ id: 'navline-l', type: 'line', source: 'navline', paint: { 'line-color': '#E8175D', 'line-width': 2, 'line-dasharray': [1, 2] } });
+  map.addLayer({ id: 'navwp-c', type: 'circle', source: 'navwp', paint: { 'circle-radius': 12, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#E8175D', 'circle-stroke-width': 3 } });
   map.addLayer({ id: 'measure-l', type: 'line', source: 'measure', filter: ['==', '$type', 'LineString'], paint: { 'line-color': '#0F2536', 'line-width': 2.5, 'line-dasharray': [2, 1.5] } });
   map.addLayer({ id: 'measure-p', type: 'circle', source: 'measure', filter: ['==', '$type', 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#0F2536', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
   map.addLayer({ id: 'sel-c', type: 'circle', source: 'sel', paint: { 'circle-radius': 18, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#F2B705', 'circle-stroke-width': 3 } });
@@ -472,7 +540,7 @@ map.on('load', () => {
     'icon-image': 'fw-own', 'icon-rotate': ['get', 'rot'], 'icon-rotation-alignment': 'map',
     'icon-allow-overlap': true, 'icon-ignore-placement': true } });
 
-  renderTrack(); renderRoute(); renderMeasure(); renderAis(); renderOwn();
+  renderTrack(); renderRoute(); renderMeasure(); renderAis(); renderOwn(); renderNav();
   pollAis(); loadWx();
 });
 
@@ -494,7 +562,17 @@ map.on('click', e => {
   if (S.tool === 'route') { S.route.push(ll); saveRoute(); renderRoute(); renderPanel(); return; }
   if (!map.getLayer('ais-sym')) return;
   const q = 16, f = map.queryRenderedFeatures([[e.point.x - q, e.point.y - q], [e.point.x + q, e.point.y + q]], { layers: ['ais-sym'] });
-  if (f.length) { S.selected = f[0].properties.mmsi; openPanel('ship'); renderSel(); }
+  if (f.length) { S.selected = f[0].properties.mmsi; openPanel('ship'); renderSel(); return; }
+  // Seezeichen, Häfen und andere Kartenobjekte
+  const all = map.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]]);
+  const seen = new Set(), objs = [];
+  for (const ft of all) {
+    if (ft.source !== 'seamap' || ft.sourceLayer !== 'seamark') continue;
+    const key = ft.id ?? JSON.stringify(ft.properties);
+    if (seen.has(key)) continue; seen.add(key);
+    objs.push({ props: ft.properties, geom: ft.geometry.type === 'Point' ? ft.geometry.coordinates : [e.lngLat.lng, e.lngLat.lat] });
+  }
+  if (objs.length) { S.objs = objs; S.objIdx = 0; openPanel('objekt'); }
 });
 
 /* ---------- Zeichnen ---------- */
@@ -523,6 +601,100 @@ function renderSel() {
   if (!src('sel')) return;
   const s = S.selected != null && S.ais.get(S.selected);
   src('sel').setData(s && S.aisOn ? fc([pt([s.lon, s.lat])]) : fc());
+}
+
+/* ---------- Routen-Navigation ---------- */
+function navInfo() {
+  if (!S.nav.on || !S.route.length) return null;
+  const i = Math.min(S.nav.wp, S.route.length - 1), wp = S.route[i], o = S.own;
+  if (!o) return { wp: i, noFix: true };
+  const brg = bearing(o.p, wp), dst = distNm(o.p, wp);
+  const prev = i > 0 ? S.route[i - 1] : null;
+  const xte = prev ? xteNm(prev, wp, o.p) : 0;
+  const moving = o.sog > .5 && o.cog != null;
+  const spd = moving ? Math.max(0, o.sog * Math.cos(rad(brg - o.cog))) : (S.routeSpeed || 0);
+  const rest = dst + pathNm(S.route.slice(i));
+  return { wp: i, brg, dst, xte, moving, spd, hWp: spd > .1 ? dst / spd : NaN, hEnd: spd > .1 ? rest / spd : NaN };
+}
+function navUpdate() {
+  if (!S.nav.on || !S.own || !S.route.length) return;
+  const i = Math.min(S.nav.wp, S.route.length - 1), wp = S.route[i], prev = i > 0 ? S.route[i - 1] : null;
+  const d = distNm(S.own.p, wp);
+  const passed = prev && alongNm(prev, wp, S.own.p) > distNm(prev, wp) && d < .3;
+  if (d < .05 || passed) {
+    if (i < S.route.length - 1) { S.nav.wp = i + 1; toast(`${t('navTo')} ${t('wp')}${i + 2}`); }
+    else { S.nav.on = false; toast(t('navArrived'), 6000); }
+    renderNav(); if (S.panel === 'route' || S.panel === 'fahrt') renderPanel();
+  }
+}
+function renderNav() {
+  if (!src('navline')) return;
+  if (!S.nav.on || !S.route.length) { src('navline').setData(fc()); src('navwp').setData(fc()); return; }
+  const wp = S.route[Math.min(S.nav.wp, S.route.length - 1)];
+  src('navwp').setData(fc([pt(wp)]));
+  src('navline').setData(S.own ? fc([ln([S.own.p, wp])]) : fc());
+}
+function navBlock() {
+  const n = navInfo(); if (!n) return '';
+  if (n.noFix) return `<p class="note">${t('navNoGps')}</p>`;
+  const side = n.xte > 0 ? t('steerL') : t('steerR');
+  const xm = Math.abs(n.xte) < .54 ? `${Math.round(Math.abs(n.xte) * 1852)} m` : `${nf(Math.abs(n.xte), 2)} sm`;
+  const at = new Date();
+  const fmtEta = h => isFinite(h) ? new Date(at.getTime() + h * 3.6e6).toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' }) + ` (${fmtDur(h)})` : '–';
+  return `<p class="note">${t('navTo')} <b>${t('wp')}${n.wp + 1}</b>${n.moving ? '' : `, ${t('atSpeed')} ${nf(n.spd)} kn ${t('planned')}`}</p>
+  <div class="readout">
+    <div><b>${deg3(n.brg)}</b><span>${t('brg')}</span></div>
+    <div><b>${nf(n.dst, 2)}<small>sm</small></b><span>${t('dst')}</span></div>
+  </div>
+  <dl class="kv">
+    <dt>${t('xte')}</dt><dd>${Math.abs(n.xte) < .01 ? '0 m' : `${xm} ${side}`}</dd>
+    <dt>${t('etaWp')}</dt><dd>${fmtEta(n.hWp)}</dd>
+    <dt>${t('etaEnd')}</dt><dd>${fmtEta(n.hEnd)}</dd>
+  </dl>`;
+}
+
+/* ---------- Wind entlang der Route ---------- */
+async function loadRouteWx() {
+  const r = S.route; if (r.length < 2) return;
+  S.routeWxState = 'loading'; renderPanel();
+  const spd = S.routeSpeed || 5, now = Date.now();
+  const pts = r.map((p, k) => ({ p, k, course: k > 0 ? bearing(r[k - 1], p) : bearing(p, r[1]) }));
+  let cum = 0; pts.forEach((w, k) => { if (k) cum += distNm(r[k - 1], w.p); w.eta = now + cum / spd * 3.6e6; });
+  const lat = pts.map(w => w.p[1].toFixed(3)).join(','), lon = pts.map(w => w.p[0].toFixed(3)).join(',');
+  try {
+    const [w, m] = await Promise.allSettled([
+      fetchJson(`${CFG.meteo}?latitude=${lat}&longitude=${lon}&timezone=auto&forecast_days=7&wind_speed_unit=kn&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m`),
+      fetchJson(`${CFG.marine}?latitude=${lat}&longitude=${lon}&timezone=auto&forecast_days=7&hourly=wave_height`)
+    ]);
+    if (w.status !== 'fulfilled') throw new Error('wx');
+    const W = [].concat(w.value), M = m.status === 'fulfilled' ? [].concat(m.value) : [];
+    pts.forEach((wp, k) => {
+      const d = W[k]; if (!d || !d.hourly) return;
+      const local = new Date(wp.eta + (d.utc_offset_seconds || 0) * 1000).toISOString().slice(0, 13) + ':00';
+      let i = d.hourly.time.findIndex(x => x >= local); if (i < 0) i = d.hourly.time.length - 1;
+      wp.kn = d.hourly.wind_speed_10m[i]; wp.dir = d.hourly.wind_direction_10m[i]; wp.gust = d.hourly.wind_gusts_10m[i];
+      const mm = M[k];
+      if (mm && mm.hourly) { const j = mm.hourly.time.findIndex(x => x >= local); wp.wave = j >= 0 ? mm.hourly.wave_height[j] : null; }
+    });
+    S.routeWx = { at: now, pts }; S.routeWxState = 'ok';
+  } catch { S.routeWxState = 'error'; }
+  renderPanel();
+}
+function relWind(windFrom, course) {
+  const a = ((windFrom - course) % 360 + 360) % 360, off = a > 180 ? 360 - a : a;
+  const cls = off < 30 ? 0 : off < 60 ? 1 : off < 110 ? 2 : off < 150 ? 3 : 4;
+  return `${t('rel' + cls)}${cls && cls < 4 ? ' ' + (a < 180 ? t('stbdS') : t('portS')) : ''}`;
+}
+function routeWxTable() {
+  if (S.routeWxState === 'loading') return `<p class="note">${t('routeWxLoading')}</p>`;
+  if (S.routeWxState === 'error') return `<p class="note err">${t('routeWxErr')}</p>`;
+  if (!S.routeWx) return '';
+  const rows = S.routeWx.pts.map(w => `<tr><td>${t('wp')}${w.k + 1}<br><span class="note">${new Date(w.eta).toLocaleString(loc(), { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</span></td>
+    <td>${w.kn != null ? `${Math.round(w.kn)} <span class="note">(${Math.round(w.gust)})</span><br><span class="note">${bft(w.kn)} Bft</span>` : '–'}</td>
+    <td>${w.dir != null ? `${compass(w.dir)} <svg class="arr" viewBox="0 0 24 24" style="transform:rotate(${w.dir}deg)"><path d="M12 3v18M6 15l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5"/></svg><br><span class="note">${relWind(w.dir, w.course)}</span>` : '–'}</td>
+    <td>${w.wave != null ? nf(w.wave) + ' m' : '–'}</td></tr>`).join('');
+  return `<table class="t"><thead><tr><th>${t('eta')}</th><th>kn</th><th>${t('from')}</th><th>${t('waves')}</th></tr></thead><tbody>${rows}</tbody></table>
+  <p class="note">${t('wxAt')} ${new Date(S.routeWx.at).toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' })}, ${t('speed').toLowerCase()} ${nf(S.routeSpeed)}.</p>`;
 }
 
 /* ---------- AIS ---------- */
@@ -647,8 +819,8 @@ function onPos(pos) {
     }
   }
   if (S.follow) map.easeTo({ center: p, duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600 });
-  renderOwn(); renderStatus();
-  if (S.panel === 'fahrt') renderPanel();
+  renderOwn(); renderNav(); navUpdate(); renderStatus();
+  if (S.panel === 'fahrt' || (S.panel === 'route' && S.nav.on)) renderPanel();
 }
 
 /* ---------- Status & Chips ---------- */
@@ -673,13 +845,14 @@ setInterval(renderStatus, 15000);
 
 /* ---------- Panels ---------- */
 const TAB_OF = { ship: 'schiffe', ort: 'mehr', gezeiten: 'mehr', info: 'mehr' };
+const NO_TAB = { objekt: true };
 function openPanel(name) {
   S.panel = name;
   S.tool = name === 'messen' ? 'measure' : name === 'route' ? 'route' : null;
   $('map').classList.toggle('tool', !!S.tool);
   $('sheet').hidden = false; document.body.classList.add('has-sheet');
   $('backBtn').hidden = !TAB_OF[name];
-  const tab = TAB_OF[name] || name;
+  const tab = NO_TAB[name] ? '' : (TAB_OF[name] || name);
   document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-current', b.dataset.tab === tab));
   if (name === 'fahrt') startGps();
   if (name === 'wetter' || name === 'gezeiten') loadWx();
@@ -694,9 +867,9 @@ function closePanel() {
 }
 function renderPanel() {
   if (!S.panel) return;
-  $('sheetTitle').textContent = S.panel === 'ship' ? (shipName(S.ais.get(S.selected)) || t('ship')) : t(S.panel);
+  $('sheetTitle').textContent = S.panel === 'ship' ? (shipName(S.ais.get(S.selected)) || t('ship')) : S.panel === 'objekt' ? objTitle(S.objs[S.objIdx]) : t(S.panel);
   const body = $('sheetBody');
-  const fn = { fahrt: pFahrt, messen: pMessen, route: pRoute, schiffe: pSchiffe, ship: pShip, wetter: pWetter, mehr: pMehr, ort: pOrt, gezeiten: pGezeiten, info: pInfo }[S.panel];
+  const fn = { fahrt: pFahrt, messen: pMessen, route: pRoute, schiffe: pSchiffe, ship: pShip, wetter: pWetter, mehr: pMehr, ort: pOrt, gezeiten: pGezeiten, info: pInfo, objekt: pObjekt }[S.panel];
   body.innerHTML = fn();
 }
 const btn = (act, label, extra = '') => `<button class="btn" type="button" data-act="${act}" ${extra}>${label}</button>`;
@@ -705,7 +878,7 @@ const shipName = s => s ? (s.name && s.name.replace(/@+$/, '').trim()) || `MMSI 
 function pFahrt() {
   const o = S.own, gps = S.watchId != null;
   const tn = pathNm(S.track.map(p => [p[0], p[1]]));
-  return `
+  return `${S.nav.on ? navBlock() + '<hr style="border:0;border-top:1px solid var(--line);margin:12px 0">' : ''}
   <div class="readout">
     <div><b>${o ? nf(o.sog) : '–'}<small>kn</small></b><span>${t('sog')}</span></div>
     <div><b>${o ? deg3(o.cog) : '–'}</b><span>${t('cog')}</span></div>
@@ -751,7 +924,12 @@ function pRoute() {
   const total = pathNm(r), h = total / (S.routeSpeed || NaN);
   const eta = isFinite(h) ? new Date(Date.now() + h * 3.6e6) : null;
   const legs = r.slice(1).map((p, i) => `<tr><td>${t('wp')}${i + 1} › ${t('wp')}${i + 2}</td><td>${nf(distNm(r[i], p), 2)} sm</td><td>${deg3(bearing(r[i], p))}</td></tr>`).join('');
+  const navBtns = S.nav.on
+    ? `${btn('navPrev', t('navPrev'), S.nav.wp > 0 ? '' : 'disabled')}${btn('navNext', t('navNext'), S.nav.wp < r.length - 1 ? '' : 'disabled')}${btn('navStop', t('navStop'))}`
+    : btn('navStart', t('navStart'), 'aria-pressed="false"');
   return `
+  ${S.nav.on ? navBlock() : ''}
+  <div class="row">${navBtns}</div>
   ${r.length > 1 ? `<table class="t"><thead><tr><th></th><th>${t('distance')}</th><th>${t('course')}</th></tr></thead><tbody>${legs}</tbody></table>` : `<p class="note">${t('routeHint')}</p>`}
   <label class="f" for="spd">${t('speed')}</label>
   <input id="spd" type="number" inputmode="decimal" min="0.5" max="60" step="0.5" value="${S.routeSpeed}" data-input="speed">
@@ -765,7 +943,52 @@ function pRoute() {
     ${btn('routeRev', t('reverseRoute'), r.length > 1 ? '' : 'disabled')}
     ${btn('routeGpx', t('gpx'), r.length > 1 ? '' : 'disabled')}
     ${btn('routeClear', t('clear'))}
-  </div>`;
+  </div>
+  <div class="row">${btn('routeWx', t('routeWx'), r.length > 1 ? '' : 'disabled')}</div>
+  ${routeWxTable()}`;
+}
+
+/* ---------- Kartenobjekte ---------- */
+function objTitle(o) {
+  if (!o) return t('objekt');
+  const p = o.props, nm = p.name || p['seamark:name'];
+  return nm ? String(nm) : (SEAMARK[lang][p.type] || SEAMARK.de[p.type] || vt(p.type || t('objekt')));
+}
+function lightRows(p) {
+  const secs = {};
+  for (const [k, v] of Object.entries(p)) {
+    const m = k.match(/^seamark:light(?::(\d+))?:(\w+)$/); if (!m) continue;
+    (secs[m[1] || '0'] ||= {})[m[2]] = v;
+  }
+  const abbr = c => String(c || '').split(';').map(x => ({ white: 'W', red: 'R', green: 'G', yellow: 'Y', blue: 'Bu', orange: 'Or', amber: 'Am' }[x.trim()] || x)).join('');
+  return Object.entries(secs).sort().map(([i, L]) => {
+    const ch = `${L.character || ''}${L.group ? `(${L.group})` : ''} ${abbr(L.colour)} ${L.period ? L.period + 's' : ''} ${L.height ? L.height + 'm' : ''} ${L.range ? L.range + 'M' : ''}`.replace(/\s+/g, ' ').trim();
+    const sec = L.sector_start != null || L.sector_end != null ? ` ${t('sector')} ${L.sector_start ?? '?'}°–${L.sector_end ?? '?'}°` : '';
+    return [`${t('light')}${i !== '0' ? ' ' + i : ''}`, esc(ch + sec)];
+  });
+}
+function pObjekt() {
+  const o = S.objs[S.objIdx]; if (!o) return `<p class="note">–</p>`;
+  const p = o.props, type = p.type || p['seamark:type'] || '';
+  const rows = [];
+  const tl = SEAMARK[lang][type] || SEAMARK.de[type];
+  if (tl || type) rows.push([t('type'), esc(tl || vt(type))]);
+  if (p.category) rows.push([lang === 'de' ? 'Kategorie' : 'Category', esc(vt(p.category))]);
+  rows.push(...lightRows(p));
+  const skip = /^(name|type|category|seamark:type|seamark:name|seamark:light|source|.*:source$|ref|osm_id)/;
+  const pretty = k => k.replace(/^seamark:/, '').replace(new RegExp('^' + type.replace(/[^\w]/g, '') + ':'), '').replace(/_/g, ' ');
+  const LBL = { colour: t('colour'), shape: t('shape'), 'topmark:shape': t('topmark'), 'topmark:colour': `${t('topmark')} ${t('colour').toLowerCase()}`, height: t('height') };
+  for (const [k, v] of Object.entries(p)) {
+    if (skip.test(k) || v === '' || v == null || typeof v === 'object') continue;
+    const key = pretty(k);
+    rows.push([esc(LBL[key] || key), esc(vt(v))]);
+    if (rows.length > 16) break;
+  }
+  const ref = S.own ? S.own.p : null;
+  rows.push([t('position'), fmtPos(o.geom)]);
+  if (ref) rows.push([t('distFrom'), `${nf(distNm(ref, o.geom), 2)} sm ${deg3(bearing(ref, o.geom))}`]);
+  const more = S.objs.length > 1 ? `<p class="note">${t('objMore')}</p><ul class="list">${S.objs.map((x, i) => i === S.objIdx ? '' : `<li><button type="button" data-act="obj" data-i="${i}"><span class="nm">${esc(objTitle(x))}</span></button></li>`).join('')}</ul>` : '';
+  return `<dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd style="text-align:left">${v}</dd>`).join('')}</dl>${more}`;
 }
 
 function aisStatusText() {
@@ -884,6 +1107,8 @@ function pInfo() {
       <button class="btn" type="submit">${t('save')}</button>
     </form>
     <p class="note">${t('relayHelp')}</p>
+    <div class="row">${btn('relayTest', t('relayTest'), S.relay ? '' : 'disabled')}</div>
+    ${S.relayTest ? `<p class="note ${S.relayTest.startsWith(t('relayFail')) ? 'err' : ''}">${esc(S.relayTest)}</p>` : ''}
     <h3 style="font:600 17px var(--fc);margin:20px 0 6px">${t('sources')}</h3>
     <p class="note">${[t('srcChart'), t('srcDepth'), t('srcWx'), t('srcGeo'), t('srcAis')].map(esc).join('<br>')}</p>
     <div class="row">${btn('clearCache', t('clearCache'))}</div>
@@ -905,7 +1130,7 @@ function gpx(kind, pts) {
     : `<trk><name>Fahrwasser ${stamp}</name><trkseg>\n${pts.map(p => `<trkpt lat="${p[1].toFixed(6)}" lon="${p[0].toFixed(6)}">${p[2] ? `<time>${new Date(p[2]).toISOString()}</time>` : ''}</trkpt>`).join('\n')}\n</trkseg></trk>`;
   download(`fahrwasser-${kind === 'rte' ? 'route' : 'track'}-${stamp}.gpx`, head + body + '\n</gpx>\n', 'application/gpx+xml');
 }
-const saveRoute = () => store.set('route', S.route);
+const saveRoute = () => { store.set('route', S.route); S.routeWx = null; S.routeWxState = 'idle'; if (S.nav.wp >= S.route.length) S.nav.wp = Math.max(0, S.route.length - 1); if (!S.route.length) S.nav.on = false; renderNav(); };
 
 const ACTIONS = {
   gps: () => S.watchId != null ? stopGps() : startGps(),
@@ -920,6 +1145,23 @@ const ACTIONS = {
   routeGpx: () => gpx('rte', S.route),
   routeClear: () => { S.route = []; saveRoute(); renderRoute(); renderPanel(); },
   aisToggle: () => toggleAis(),
+  navStart: () => { S.nav = { on: true, wp: 0 }; startGps(); renderNav(); renderPanel(); },
+  navStop: () => { S.nav.on = false; renderNav(); renderPanel(); },
+  navNext: () => { S.nav.wp = Math.min(S.route.length - 1, S.nav.wp + 1); renderNav(); renderPanel(); },
+  navPrev: () => { S.nav.wp = Math.max(0, S.nav.wp - 1); renderNav(); renderPanel(); },
+  routeWx: () => loadRouteWx(),
+  obj: el => { S.objIdx = +el.dataset.i; renderPanel(); },
+  relayTest: async () => {
+    if (!S.relay) return;
+    const c = map.getCenter();
+    const bbox = [c.lng - .5, c.lat - .3, c.lng + .5, c.lat + .3].map(v => v.toFixed(2)).join(',');
+    S.relayTest = t('testing'); renderPanel();
+    try {
+      const j = await fetchJson(`${S.relay}${S.relay.includes('?') ? '&' : '?'}bbox=${bbox}`, 25000);
+      S.relayTest = `${t('relayOk')}: ${(j.ships || []).length} ${t('ships')}`;
+    } catch (e) { S.relayTest = `${t('relayFail')}: ${(e.body && e.body.error) || e.message}`; }
+    renderPanel();
+  },
   ship: el => { S.selected = Number(el.dataset.mmsi); const s = S.ais.get(S.selected); if (s) map.easeTo({ center: [s.lon, s.lat] }); openPanel('ship'); renderSel(); },
   wxRefresh: () => { S.wx = null; renderPanel(); loadWx(true); },
   open: el => openPanel(el.dataset.to),
@@ -936,7 +1178,7 @@ $('sheetBody').addEventListener('click', e => {
 $('sheetBody').addEventListener('change', e => {
   if (e.target.dataset.input === 'speed') {
     const v = parseFloat(String(e.target.value).replace(',', '.'));
-    if (v > 0) { S.routeSpeed = v; store.set('routeSpeed', v); renderPanel(); }
+    if (v > 0) { S.routeSpeed = v; store.set('routeSpeed', v); S.routeWx = null; S.routeWxState = 'idle'; renderPanel(); }
   }
 });
 $('sheetBody').addEventListener('submit', async e => {
