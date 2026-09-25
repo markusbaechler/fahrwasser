@@ -54,7 +54,8 @@ function json(body, status, headers) {
 }
 
 async function collect(apiKey, [w, s, e, n], windowMs) {
-  const resp = await fetch('https://stream.aisstream.io/v0/stream', { headers: { Upgrade: 'websocket' } });
+  // permessage-deflate: aisstream drosselt seit Sept. 2026 unkomprimierte Verbindungen
+  const resp = await fetch('https://stream.aisstream.io/v0/stream', { headers: { Upgrade: 'websocket', 'Sec-WebSocket-Extensions': 'permessage-deflate' } });
   const ws = resp.webSocket;
   if (!ws) throw new Error(`handshake ${resp.status}`);
   ws.accept();
@@ -66,7 +67,7 @@ async function collect(apiKey, [w, s, e, n], windowMs) {
 
   const ships = new Map();
   const dec = new TextDecoder();
-  const dbg = { handshake: resp.status, msgs: 0, types: {}, close: null, first: null };
+  const dbg = { handshake: resp.status, ext: resp.headers.get('Sec-WebSocket-Extensions'), msgs: 0, types: {}, close: null, first: null };
   return new Promise((resolve, reject) => {
     let done = false;
     const finish = err => {
@@ -104,7 +105,9 @@ function merge(ships, m) {
     case 'PositionReport':
     case 'StandardClassBPositionReport':
     case 'ExtendedClassBPositionReport': {
-      if (Number.isFinite(md.latitude) && Number.isFinite(md.longitude)) { s.lat = md.latitude; s.lon = md.longitude; }
+      // aisstream: MetaData.Latitude (neu) bzw. latitude (alt), sonst Position aus der Meldung
+      const la = md.Latitude ?? md.latitude ?? body.Latitude, lo = md.Longitude ?? md.longitude ?? body.Longitude;
+      if (Number.isFinite(la) && Number.isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) { s.lat = la; s.lon = lo; }
       if (body.Sog != null && body.Sog < 102.3) s.sog = body.Sog;
       if (body.Cog != null && body.Cog < 360) s.cog = body.Cog;
       if (body.TrueHeading != null && body.TrueHeading < 360) s.hdg = body.TrueHeading;
