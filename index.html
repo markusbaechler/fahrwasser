@@ -52,7 +52,10 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 [data-mode=dusk] #map canvas{filter:invert(1) hue-rotate(180deg) brightness(.9) saturate(.85)}
 [data-mode=night] #map canvas{filter:grayscale(1) invert(1) brightness(.6) contrast(1.2)}
 #map.tool canvas{cursor:crosshair}
-.radarinfo{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:4px 10px;font-size:12px;color:var(--muted);width:max-content;margin-bottom:6px}
+.radarinfo{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:3px 10px 3px 4px;font-size:12px;color:var(--text);width:max-content;margin-bottom:6px}
+.radarinfo button{background:none;border:0;color:var(--text);font-size:14px;padding:2px 6px;min-width:0}
+.radarinfo .dots{display:flex;gap:3px}.radarinfo .dots i{width:6px;height:6px;border-radius:50%;background:var(--line)}.radarinfo .dots i.nc{background:var(--accent);opacity:.4}.radarinfo .dots i.on{background:var(--accent);opacity:1}
+.radarinfo small{color:var(--muted)}
 #windCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
 select.sel{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg);color:var(--text);font:15px var(--fc)}
 .maplibregl-ctrl-scale{background:var(--bg);color:var(--text);border-color:var(--text);font:500 12px var(--fc)}
@@ -189,7 +192,7 @@ const CFG = {
   tides: 'https://api.openwaters.io/tides',
   radar: 'https://api.rainviewer.com/public/weather-maps.json',
   aisPollMs: 20000, aisStaleMin: 10, aisDropMin: 30, aisMinZoom: 8,
-  version: '1.4.0'
+  version: '1.5.0'
 };
 
 /* ---------- Speicher (fehlertolerant) ---------- */
@@ -225,7 +228,7 @@ const I18N = {
     searchPh:'Ort, Hafen oder 43.38, 16.21', search:'Suchen', noResults:'Keine Treffer.', searchErr:'Suche fehlgeschlagen.', searching:'Suche …',
     tideNote:'Modellierter Wasserstand relativ zum mittleren Meeresspiegel (Open-Meteo Marine) – keine Pegelstation in der Nähe.', high:'Hoch', low:'Niedrig',
     tideStation:'Pegelstation', tideDatum:'Bezug', tideNeaps:'Gezeitenvorhersage aus harmonischen Konstanten (Neaps, Open Waters). Wetterbedingte Abweichungen (Windstau, Luftdruck) sind nicht enthalten.', tideNow:'Jetzt', rising:'steigend', falling:'fallend',
-    radar:'Radar', radarNote:'Regenradar', radarAt:'Radarbild von', radarErr:'Regenradar nicht verfügbar',
+    radar:'Radar', radarNote:'Regenradar', radarAt:'Radarbild von', radarErr:'Regenradar nicht verfügbar', nowcast:'Vorhersage',
     tideNone:'Für diesen Ort gibt es keine Wasserstandsdaten.', tideLoading:'Lade Wasserstand …',
     relay:'Eigenes AIS-Relay (optional)', save:'Speichern', saved:'Gespeichert', sources:'Datenquellen',
     clearCache:'Offline-Karten löschen', cacheCleared:'Offline-Karten gelöscht',
@@ -276,7 +279,7 @@ const I18N = {
     searchPh:'Place, harbour or 43.38, 16.21', search:'Search', noResults:'No results.', searchErr:'Search failed.', searching:'Searching …',
     tideNote:'Modelled water level relative to mean sea level (Open-Meteo Marine) – no tide station nearby.', high:'High', low:'Low',
     tideStation:'Tide station', tideDatum:'Datum', tideNeaps:'Tide prediction from harmonic constituents (Neaps, Open Waters). Weather effects (wind set-up, pressure) are not included.', tideNow:'Now', rising:'rising', falling:'falling',
-    radar:'Radar', radarNote:'Rain radar', radarAt:'Radar image from', radarErr:'Rain radar unavailable',
+    radar:'Radar', radarNote:'Rain radar', radarAt:'Radar image from', radarErr:'Rain radar unavailable', nowcast:'nowcast',
     tideNone:'No water level data for this location.', tideLoading:'Loading water level …',
     relay:'Own AIS relay (optional)', save:'Save', saved:'Saved', sources:'Data sources',
     clearCache:'Delete offline charts', cacheCleared:'Offline charts deleted',
@@ -393,7 +396,7 @@ const S = {
   tracking: false, track: store.get('track', []),
   measure: [], route: store.get('route', []), routeSpeed: store.get('routeSpeed', 5),
   ais: new Map(), aisOn: store.get('aisOn', true), aisStatus: 'idle', aisAt: null, relay: store.get('relay', ''), aisAttrib: null,
-  windOn: store.get('windOn', true), radarOn: store.get('radarOn', false), radar: null, radarAt: 0, radarErr: false,
+  windOn: store.get('windOn', true), radarOn: store.get('radarOn', false), radarPlay: store.get('radarPlay', true), radar: null, radarAt: 0, radarErr: false,
   tide: null, tidePos: null, tideAt: 0, tideErr: false, wxModel: store.get('wxModel', 'best_match'), wx: null, marine: null, wxAt: 0, wxPos: null, wxErr: false, marineErr: false,
   nav: { on: false, wp: 0 }, routeWx: null, routeWxState: 'idle', objs: [], objIdx: 0, relayTest: '',
   selected: null, searchQ: '', searchRes: [], searchState: 'idle', online: navigator.onLine
@@ -867,24 +870,40 @@ async function loadRadar(force) {
   if (!force && Date.now() - S.radarAt < 5 * 60000) return;
   try {
     const j = await fetchJson(CFG.radar, 12000);
-    const frames = (j.radar && j.radar.past) || [];
-    const f = frames[frames.length - 1]; if (!f) throw new Error('no frame');
-    S.radar = { host: j.host, path: f.path, time: f.time * 1000 }; S.radarAt = Date.now(); S.radarErr = false;
+    const past = ((j.radar && j.radar.past) || []).slice(-7), next = ((j.radar && j.radar.nowcast) || []).slice(0, 3);
+    const frames = [...past.map(f => ({ ...f, now: false })), ...next.map(f => ({ ...f, now: true }))];
+    if (!frames.length) throw new Error('no frame');
+    S.radar = { host: j.host, frames, i: past.length - 1 }; S.radarAt = Date.now(); S.radarErr = false;
   } catch { S.radarErr = true; }
   renderRadar();
 }
+let radarTimer = null;
+function radarClear() {
+  clearInterval(radarTimer); radarTimer = null;
+  (map.getStyle().layers || []).filter(l => l.id.startsWith('radar-')).forEach(l => map.removeLayer(l.id));
+  Object.keys(map.getStyle().sources || {}).filter(k => k.startsWith('radar-')).forEach(k => map.removeSource(k));
+}
 function renderRadar() {
   if (!mapReady) return;
-  if (map.getLayer('radar-l')) map.removeLayer('radar-l');
-  if (map.getSource('radar')) map.removeSource('radar');
+  radarClear();
   $('radarInfo').hidden = !S.radarOn;
   if (!S.radarOn) return;
   if (!S.radar) { $('radarInfo').textContent = S.radarErr ? t('radarErr') : t('radarNote') + ' …'; return; }
-  map.addSource('radar', { type: 'raster', tiles: [`${S.radar.host}${S.radar.path}/256/{z}/{x}/{y}/2/1_1.png`], tileSize: 256, maxzoom: 12, attribution: 'RainViewer' });
-  // unter Seezeichen und eigenen Layern einordnen, damit Tiefen und Tonnen lesbar bleiben
-  const before = map.getStyle().layers.find(l => l.type === 'symbol' && l.id !== 'radar-l');
-  map.addLayer({ id: 'radar-l', type: 'raster', source: 'radar', paint: { 'raster-opacity': .5, 'raster-fade-duration': 0 } }, before ? before.id : 'track-l');
-  $('radarInfo').textContent = `${t('radarAt')} ${new Date(S.radar.time).toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' })}`;
+  const R = S.radar, before = map.getStyle().layers.find(l => l.type === 'symbol');
+  R.frames.forEach((f, k) => {
+    map.addSource(`radar-${k}`, { type: 'raster', tiles: [`${R.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`], tileSize: 256, maxzoom: 12, attribution: 'RainViewer' });
+    map.addLayer({ id: `radar-${k}`, type: 'raster', source: `radar-${k}`, paint: { 'raster-opacity': 0, 'raster-fade-duration': 0, 'raster-opacity-transition': { duration: 0 } } }, before ? before.id : 'track-l');
+  });
+  radarShow(R.i);
+  if (S.radarPlay) radarTimer = setInterval(() => { if (document.hidden) return; R.i = (R.i + 1) % R.frames.length; radarShow(R.i); }, R.i === R.frames.length - 1 ? 1400 : 700);
+}
+function radarShow(i) {
+  const R = S.radar; if (!R) return;
+  R.frames.forEach((f, k) => { if (map.getLayer(`radar-${k}`)) map.setPaintProperty(`radar-${k}`, 'raster-opacity', k === i ? .55 : 0); });
+  const f = R.frames[i], tm = new Date(f.time * 1000).toLocaleTimeString(loc(), { hour: '2-digit', minute: '2-digit' });
+  const dots = R.frames.map((x, k) => `<i class="${k === i ? 'on' : ''}${x.now ? ' nc' : ''}"></i>`).join('');
+  $('radarInfo').innerHTML = `<button type="button" id="radarPlay" aria-label="${S.radarPlay ? 'Pause' : 'Play'}">${S.radarPlay ? '❚❚' : '▶'}</button><span>${f.now ? '+' : ''}${tm}${f.now ? ` <small>${t('nowcast')}</small>` : ''}</span><span class="dots">${dots}</span>`;
+  $('radarPlay').onclick = () => { S.radarPlay = !S.radarPlay; store.set('radarPlay', S.radarPlay); renderRadar(); };
 }
 setInterval(() => loadRadar(), 5 * 60000);
 
@@ -909,7 +928,7 @@ function windResize() {
 function windClear() { if (WF.g) WF.g.clearRect(0, 0, WF.w, WF.h); WF.parts = []; }
 async function loadField() {
   if (!mapReady || !S.windOn || !S.online) return;
-  const b = map.getBounds(), NX = 5, NY = 4, W = b.getWest(), E = b.getEast(), So = b.getSouth(), N = b.getNorth();
+  const b = map.getBounds(), NX = 7, NY = 5, W = b.getWest(), E = b.getEast(), So = b.getSouth(), N = b.getNorth();
   const key = [W, So, E, N].map(v => v.toFixed(2)).join(',') + '|' + S.wxModel;
   if (key === WF.gridKey && Date.now() - WF.gridAt < 15 * 60000) return;
   const lats = [], lons = [];
@@ -923,7 +942,7 @@ async function loadField() {
     // u = Ost-, v = Nord-Komponente der Windbewegung (Richtung, wohin er weht)
     const pts = arr.map((d, k) => {
       const kn = d.current.wind_speed_10m, to = rad((d.current.wind_direction_10m + 180) % 360);
-      return { u: kn * Math.sin(to), v: kn * Math.cos(to) };
+      return { u: kn * Math.sin(to), v: kn * Math.cos(to), kn };
     });
     WF.grid = { nx: NX, ny: NY, W, E, S: So, N, pts };
     WF.gridKey = key; WF.gridAt = Date.now(); windClear();
@@ -942,27 +961,32 @@ function windAt(lng, lat) {
     v: (a.v * (1 - tx) + b.v * tx) * (1 - ty) + (c.v * (1 - tx) + d.v * tx) * ty
   };
 }
+const WIND_COLORS = [[5, '110,140,170'], [10, '70,130,200'], [17, '60,170,110'], [22, '210,180,40'], [28, '230,120,30'], [34, '220,50,40'], [1e9, '160,30,120']];
+function windColor(kn) { for (const [max, c] of WIND_COLORS) if (kn < max) return c; }
 function windFrame() {
   requestAnimationFrame(windFrame);
   if (!S.windOn || !WF.grid || WF.moving || document.hidden || !WF.g) return;
-  const g = WF.g, n = Math.min(400, Math.round(WF.w * WF.h / 1800));
-  while (WF.parts.length < n) WF.parts.push({ x: Math.random() * WF.w, y: Math.random() * WF.h, age: Math.random() * 90 | 0 });
-  // Spuren ausblenden
-  g.globalCompositeOperation = 'destination-in'; g.fillStyle = 'rgba(0,0,0,.93)'; g.fillRect(0, 0, WF.w, WF.h);
+  const g = WF.g, n = Math.min(700, Math.round(WF.w * WF.h / 1100));
+  while (WF.parts.length < n) WF.parts.push({ x: Math.random() * WF.w, y: Math.random() * WF.h, age: Math.random() * 100 | 0 });
+  g.globalCompositeOperation = 'destination-in'; g.fillStyle = 'rgba(0,0,0,.955)'; g.fillRect(0, 0, WF.w, WF.h);
   g.globalCompositeOperation = 'source-over';
-  g.lineWidth = 1.4; g.lineCap = 'round'; g.strokeStyle = S.mode === 'day' ? 'rgba(15,37,54,.55)' : 'rgba(15,37,54,.75)';
-  g.beginPath();
+  g.lineWidth = 1.6; g.lineCap = 'round';
+  const alpha = S.mode === 'day' ? .75 : .85, buckets = new Map(), k = 0.085;
   for (const p of WF.parts) {
-    if (++p.age > 90) { p.x = Math.random() * WF.w; p.y = Math.random() * WF.h; p.age = 0; continue; }
+    if (++p.age > 100) { p.x = Math.random() * WF.w; p.y = Math.random() * WF.h; p.age = 0; continue; }
     const ll = map.unproject([p.x, p.y]);
-    const w = windAt(ll.lng, ll.lat);
-    const k = 0.07; // Pixel pro Knoten und Frame
+    const w = windAt(ll.lng, ll.lat), kn = Math.hypot(w.u, w.v);
     const nx = p.x + w.u * k, ny = p.y - w.v * k;
-    g.moveTo(p.x, p.y); g.lineTo(nx, ny);
+    const c = windColor(kn); let arr = buckets.get(c); if (!arr) buckets.set(c, arr = []);
+    arr.push(p.x, p.y, nx, ny);
     p.x = nx; p.y = ny;
     if (p.x < 0 || p.y < 0 || p.x > WF.w || p.y > WF.h) p.age = 999;
   }
-  g.stroke();
+  for (const [c, arr] of buckets) {
+    g.strokeStyle = `rgba(${c},${alpha})`; g.beginPath();
+    for (let i = 0; i < arr.length; i += 4) { g.moveTo(arr[i], arr[i + 1]); g.lineTo(arr[i + 2], arr[i + 3]); }
+    g.stroke();
+  }
 }
 document.addEventListener('visibilitychange', () => { if (document.hidden) windClear(); });
 
