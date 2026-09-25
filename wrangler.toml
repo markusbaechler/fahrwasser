@@ -6,3 +6,4 @@ workers_dev = true
 
 [vars]
 WINDOW_MS = "10000"
+DEBUG_WORLD = "1"
