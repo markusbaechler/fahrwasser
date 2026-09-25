@@ -1,0 +1,49 @@
+name: Deploy AIS relay
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ais-relay-worker.js
+      - wrangler.toml
+      - .github/workflows/deploy-worker.yml
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Account-ID ermitteln
+        id: acct
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          ID=$(curl -sf -H "Authorization: Bearer $CF_TOKEN" \
+            https://api.cloudflare.com/client/v4/accounts \
+            | python3 -c "import json,sys;print(json.load(sys.stdin)['result'][0]['id'])")
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
+      - name: Worker deployen + Secret setzen
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ steps.acct.outputs.id }}
+          command: deploy
+          secrets: |
+            AISSTREAM_API_KEY
+        env:
+          AISSTREAM_API_KEY: ${{ secrets.AISSTREAM_API_KEY }}
+
+      - name: Relay-URL anzeigen
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCT: ${{ steps.acct.outputs.id }}
+        run: |
+          SUB=$(curl -sf -H "Authorization: Bearer $CF_TOKEN" \
+            https://api.cloudflare.com/client/v4/accounts/$ACCT/workers/subdomain \
+            | python3 -c "import json,sys;print(json.load(sys.stdin)['result']['subdomain'])")
+          echo "### Relay-URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://fahrwasser-ais.$SUB.workers.dev" >> "$GITHUB_STEP_SUMMARY"
+          echo "RELAY: https://fahrwasser-ais.$SUB.workers.dev"
