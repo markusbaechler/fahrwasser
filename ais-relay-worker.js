@@ -35,8 +35,9 @@ export default {
     if (cached && Date.now() - cached.at < TTL_MS) return json(cached.body, 200, cors);
 
     try {
-      const ships = await collect(env.AISSTREAM_API_KEY, box, Number(env.WINDOW_MS) || 8000);
-      const body = { ts: new Date().toISOString(), bbox: box, ships };
+      const t0 = Date.now();
+      const { ships, dbg } = await collect(env.AISSTREAM_API_KEY, box, Number(env.WINDOW_MS) || 8000);
+      const body = { ts: new Date().toISOString(), bbox: box, ships, debug: { ...dbg, ms: Date.now() - t0 } };
       memo.set(key, { at: Date.now(), body });
       if (memo.size > 200) memo.delete(memo.keys().next().value);
       return json(body, 200, cors);
@@ -65,24 +66,28 @@ async function collect(apiKey, [w, s, e, n], windowMs) {
 
   const ships = new Map();
   const dec = new TextDecoder();
+  const dbg = { handshake: resp.status, msgs: 0, types: {}, close: null, first: null };
   return new Promise((resolve, reject) => {
     let done = false;
     const finish = err => {
       if (done) return;
       done = true; clearTimeout(timer);
       try { ws.close(1000, 'done'); } catch {}
-      err && !ships.size ? reject(err) : resolve([...ships.values()].filter(x => Number.isFinite(x.lat) || x.name));
+      err && !ships.size ? reject(err) : resolve({ ships: [...ships.values()].filter(x => Number.isFinite(x.lat) || x.name), dbg });
     };
     const timer = setTimeout(() => finish(), windowMs);
     ws.addEventListener('message', ev => {
       try {
-        const m = JSON.parse(typeof ev.data === 'string' ? ev.data : dec.decode(ev.data));
+        const raw = typeof ev.data === 'string' ? ev.data : dec.decode(ev.data);
+        dbg.msgs++; if (!dbg.first) dbg.first = raw.slice(0, 160);
+        const m = JSON.parse(raw);
+        dbg.types[m.MessageType || (m.error ? 'error' : '?')] = (dbg.types[m.MessageType || (m.error ? 'error' : '?')] || 0) + 1;
         if (m.error) return finish(new Error(m.error));
         merge(ships, m);
       } catch {}
     });
-    ws.addEventListener('close', () => finish());
-    ws.addEventListener('error', () => finish(new Error('socket')));
+    ws.addEventListener('close', ev => { dbg.close = { code: ev.code, reason: ev.reason, clean: ev.wasClean }; finish(); });
+    ws.addEventListener('error', ev => { dbg.close = { error: String(ev && ev.message || 'socket') }; finish(new Error('socket')); });
   });
 }
 
