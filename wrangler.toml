@@ -5,4 +5,4 @@ compatibility_date = "2025-06-01"
 workers_dev = true
 
 [vars]
-WINDOW_MS = "20000"
+WINDOW_MS = "15000"
