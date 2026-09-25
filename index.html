@@ -181,7 +181,7 @@ const CFG = {
   marine: 'https://marine-api.open-meteo.com/v1/marine',
   geocode: 'https://nominatim.openstreetmap.org/search',
   aisPollMs: 20000, aisStaleMin: 10, aisDropMin: 30, aisMinZoom: 8,
-  version: '1.1.0'
+  version: '1.1.1'
 };
 
 /* ---------- Speicher (fehlertolerant) ---------- */
@@ -227,7 +227,7 @@ const I18N = {
     srcWx:'Wetter, Wellen, Wasserstand: Open-Meteo (CC BY 4.0)',
     srcGeo:'Ortssuche: Nominatim, © OpenStreetMap-Mitwirkende',
     srcAis:'AIS: aisstream.io über dein eigenes Relay',
-    relayHelp:'Die Adresse deines Cloudflare Workers, z.B. https://fahrwasser-ais.deinname.workers.dev',
+    relayHelp:'Standard: https://fahrwasser-ais.markus-baechler.workers.dev (nur ändern, wenn du ein eigenes Relay betreibst)',
     navStart:'Navigation starten', navStop:'Navigation beenden', navNext:'Nächster WP', navPrev:'Vorheriger WP',
     brg:'Peilung', dst:'Distanz', xte:'Kursabweichung', etaWp:'Ankunft WP', etaEnd:'Ankunft Ziel', navTo:'Kurs auf',
     steerL:'nach Backbord', steerR:'nach Steuerbord', navArrived:'Ziel erreicht.', navNoGps:'Warte auf GPS-Position …',
@@ -273,7 +273,7 @@ const I18N = {
     srcWx:'Weather, waves, water level: Open-Meteo (CC BY 4.0)',
     srcGeo:'Place search: Nominatim, © OpenStreetMap contributors',
     srcAis:'AIS: aisstream.io via your own relay',
-    relayHelp:'Your Cloudflare Worker address, e.g. https://fahrwasser-ais.yourname.workers.dev',
+    relayHelp:'Default: https://fahrwasser-ais.markus-baechler.workers.dev (change only if you run your own relay)',
     navStart:'Start navigation', navStop:'Stop navigation', navNext:'Next WP', navPrev:'Previous WP',
     brg:'Bearing', dst:'Distance', xte:'Cross-track error', etaWp:'ETA waypoint', etaEnd:'ETA destination', navTo:'Heading for',
     steerL:'steer port', steerR:'steer starboard', navArrived:'Destination reached.', navNoGps:'Waiting for GPS fix …',
@@ -374,7 +374,7 @@ const S = {
   own: null, follow: false, watchId: null,
   tracking: false, track: store.get('track', []),
   measure: [], route: store.get('route', []), routeSpeed: store.get('routeSpeed', 5),
-  ais: new Map(), aisOn: store.get('aisOn', true), aisStatus: 'idle', aisAt: null, relay: store.get('relay', ''),
+  ais: new Map(), aisOn: store.get('aisOn', true), aisStatus: 'idle', aisAt: null, relay: store.get('relay', 'https://fahrwasser-ais.markus-baechler.workers.dev'),
   windOn: store.get('windOn', true), wx: null, marine: null, wxAt: 0, wxPos: null, wxErr: false, marineErr: false,
   nav: { on: false, wp: 0 }, routeWx: null, routeWxState: 'idle', objs: [], objIdx: 0, relayTest: '',
   selected: null, searchQ: '', searchRes: [], searchState: 'idle', online: navigator.onLine
